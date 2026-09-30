@@ -90,9 +90,15 @@ test('bot-only matches keep finishing rounds', () => {
   const g = new Game();
   for (const id of ['a', 'b', 'c']) g.join(id, id);
   g.reset();
-  const first = g.round;
-  for (let t = 0; t < 240; t += 1 / 30) { for (const id of ['a', 'b', 'c']) botThink(g, id); g.tick(1 / 30); }
-  expect(g.round - first).toBeGreaterThanOrEqual(2); // no stalemates: bots engage and rounds end
+  let rounds = 0, wins = 0;
+  for (let t = 0; t < 600; t += 1 / 30) {
+    for (const id of ['a', 'b', 'c']) botThink(g, id);
+    const before = g.overT;
+    g.tick(1 / 30);
+    if (!before && g.overT) { rounds++; if (g.msg.includes('wins')) wins++; }
+  }
+  expect(rounds).toBeGreaterThanOrEqual(5); // bots engage, rounds end
+  expect(wins / rounds).toBeGreaterThan(0.6); // mostly decided by skill, not the clock
 });
 
 test('rounds time out as a draw', () => {

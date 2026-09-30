@@ -275,7 +275,9 @@ export function botThink(game, id) {
   const mine = game.bombs.filter(b => b.owner === id).length;
   if (here === start && mine < p.maxBombs && !game.bombAt(sx, sy) && hits(start) && canEscape(start)) {
     game.input(id, { t: 'bomb' });
-    return;
+    const now = game.danger(), safe = nearest(reach(passable(now)), k => !now.has(k));
+    brain.calm = false; brain.wait = 0; // it's our own bomb: no reaction delay, run immediately
+    return go(safe ? safe[1].dir : null);
   }
 
   const seen = reach(k => !danger.has(k)); // stroll only through tiles no bomb threatens
