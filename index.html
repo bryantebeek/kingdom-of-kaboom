@@ -831,7 +831,7 @@ function sync(map, list, key, make, update) {
 const walls = new Map(), crates = new Map(), players = new Map(), bombs = new Map(), flames = new Map(), items = new Map();
 const tmpV = new THREE.Vector3();
 const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-let grid = '', bombTiles = new Set();
+let grid = '', bombTiles = new Set(), bodies = new Set();
 // Death_A falls backwards: face so the tile behind is open floor, not a wall or crate.
 function fallFacing(x, y, yaw) {
   const tx = Math.round(x), ty = Math.round(y);
@@ -839,12 +839,13 @@ function fallFacing(x, y, yaw) {
   const keep = opts.find(o => o.free && Math.abs(Math.atan2(Math.sin(o.yaw - yaw), Math.cos(o.yaw - yaw))) < .1);
   return (keep ?? opts.find(o => o.free))?.yaw ?? yaw;
 }
-const walkable = (x, y) => grid[y * W + x] === '.' && !bombTiles.has(y * W + x);
+const walkable = (x, y) => grid[y * W + x] === '.' && !bombTiles.has(y * W + x) && !bodies.has(y * W + x);
 let gen = 0, myId, joined = false, round, lastMsg = '', shake = 0, time = 0, hudHtml = '';
 
 function apply(s) {
   grid = s.grid;
   bombTiles = new Set(s.bombs.map(b => b.y * W + b.x));
+  bodies = new Set(s.players.filter(p => p.alive).map(p => Math.round(p.y) * W + Math.round(p.x))); // characters block each other too
   if (s.round !== round) {
     if (round !== undefined) {
       banner(`Round ${s.round}`, 'PREPARE FOR BATTLE');

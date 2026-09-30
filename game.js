@@ -25,7 +25,17 @@ export class Game {
 
   idx(x, y) { return y * W + x; }
   bombAt(x, y) { return this.bombs.find(b => b.x === x && b.y === y); }
-  free(x, y) { return this.grid[this.idx(x, y)] === '.' && !this.bombAt(x, y); }
+  // A living player takes up its tile, or both ends of the step it's gliding along.
+  holds(q, x, y) {
+    if (!q.m) return Math.round(q.x) === x && Math.round(q.y) === y;
+    const [dx, dy] = DIRS[q.m];
+    const bx = dx > 0 ? Math.floor(q.x) : dx < 0 ? Math.ceil(q.x) : q.x, by = dy > 0 ? Math.floor(q.y) : dy < 0 ? Math.ceil(q.y) : q.y;
+    return (bx === x && by === y) || (bx + dx === x && by + dy === y);
+  }
+  free(x, y, self) {
+    return this.grid[this.idx(x, y)] === '.' && !this.bombAt(x, y)
+      && ![...this.players.values()].some(q => q !== self && q.alive && this.holds(q, x, y));
+  }
 
   // A fresh wall layout per round: the classic pillar grid with random gaps and extra walls,
   // mirrored four ways so every corner spawn is equally fair. Spawns stay open and every
@@ -120,13 +130,13 @@ export class Game {
       if (p.m && p.dir && p.dir !== p.m) { // late turn: snap back if we only just passed a center
         const bx = DIRS[p.m][0] > 0 ? Math.floor(p.x) : DIRS[p.m][0] < 0 ? Math.ceil(p.x) : p.x;
         const by = DIRS[p.m][1] > 0 ? Math.floor(p.y) : DIRS[p.m][1] < 0 ? Math.ceil(p.y) : p.y;
-        if (Math.abs(p.x - bx) + Math.abs(p.y - by) < 0.25 && this.free(bx + DIRS[p.dir][0], by + DIRS[p.dir][1])) { p.x = bx; p.y = by; }
+        if (Math.abs(p.x - bx) + Math.abs(p.y - by) < 0.25 && this.free(bx + DIRS[p.dir][0], by + DIRS[p.dir][1], p)) { p.x = bx; p.y = by; }
       }
       const cx = Math.round(p.x), cy = Math.round(p.y);
       const atCenter = Math.abs(p.x - cx) + Math.abs(p.y - cy) < 1e-6;
       if (atCenter) {
         p.x = cx; p.y = cy;
-        p.m = p.dir && this.free(cx + DIRS[p.dir][0], cy + DIRS[p.dir][1]) ? p.dir : null;
+        p.m = p.dir && this.free(cx + DIRS[p.dir][0], cy + DIRS[p.dir][1], p) ? p.dir : null;
         if (!p.m) return;
       }
       const [dx, dy] = DIRS[p.m];
@@ -227,8 +237,13 @@ export function botThink(game, id) {
   const p = game.players.get(id);
   if (!p?.alive || game.overT) return;
   const [mx, my] = p.m ? DIRS[p.m] : [0, 0];
-  const sx = mx > 0 ? Math.ceil(p.x) : mx < 0 ? Math.floor(p.x) : Math.round(p.x);
-  const sy = my > 0 ? Math.ceil(p.y) : my < 0 ? Math.floor(p.y) : Math.round(p.y);
+  // Plan from where a turn would actually happen: move() snaps a turn back to the center we just
+  // left while we're within 0.25 of it, otherwise it happens at the center we're heading into.
+  const bx = mx > 0 ? Math.floor(p.x) : mx < 0 ? Math.ceil(p.x) : Math.round(p.x);
+  const by = my > 0 ? Math.floor(p.y) : my < 0 ? Math.ceil(p.y) : Math.round(p.y);
+  const back = Math.abs(p.x - bx) + Math.abs(p.y - by) < 0.25;
+  const sx = back ? bx : mx > 0 ? Math.ceil(p.x) : mx < 0 ? Math.floor(p.x) : bx;
+  const sy = back ? by : my > 0 ? Math.ceil(p.y) : my < 0 ? Math.floor(p.y) : by;
   const start = game.idx(sx, sy), speed = 1 / p.delay;
   const danger = game.danger();
 
@@ -239,7 +254,7 @@ export function botThink(game, id) {
       const { d, dir } = seen.get(k), x = k % W, y = (k - x) / W;
       for (const [name, [dx, dy]] of Object.entries(DIRS)) {
         const n = game.idx(x + dx, y + dy);
-        if (seen.has(n) || game.grid[n] !== '.' || game.bombAt(x + dx, y + dy) || !ok(n, (d + 1) / speed)) continue;
+        if (seen.has(n) || !game.free(x + dx, y + dy, p) || !ok(n, (d + 1) / speed)) continue; // walls, crates, bombs, other players
         seen.set(n, { d: d + 1, dir: dir ?? name });
         queue.push(n);
       }
@@ -247,7 +262,10 @@ export function botThink(game, id) {
     return seen;
   };
   const passable = map => (k, t) => !map.has(k) || t < map.get(k) - 0.25; // cross before it burns
-  const go = dir => { if (p.dir !== dir) game.input(id, { t: 'dir', d: dir }); };
+  const go = (dir, urgent) => {
+    if (!urgent && !back && p.m && dir === OPPOSITE[p.m]) return; // finish the step before turning around: no dithering mid-tile
+    if (p.dir !== dir) game.input(id, { t: 'dir', d: dir });
+  };
   const nearest = (seen, want) => [...seen].sort((a, b) => a[1].d - b[1].d).find(([k]) => want(k)); // closest first, stops early
 
   const brain = p.bot ??= { calm: true, wait: 0 };
@@ -256,7 +274,7 @@ export function botThink(game, id) {
     if (brain.wait-- > 0) return;
     const seen = reach(passable(danger));
     const safe = nearest(seen, k => !danger.has(k));
-    return go(safe ? safe[1].dir : null);
+    return go(safe ? safe[1].dir : null, true);
   }
   brain.calm = true;
 
@@ -277,7 +295,7 @@ export function botThink(game, id) {
     game.input(id, { t: 'bomb' });
     const now = game.danger(), safe = nearest(reach(passable(now)), k => !now.has(k));
     brain.calm = false; brain.wait = 0; // it's our own bomb: no reaction delay, run immediately
-    return go(safe ? safe[1].dir : null);
+    return go(safe ? safe[1].dir : null, true);
   }
 
   const seen = reach(k => !danger.has(k)); // stroll only through tiles no bomb threatens
