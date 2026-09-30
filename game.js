@@ -32,7 +32,7 @@ export class Game {
   // open tile stays reachable (retried until it is).
   makeWalls() {
     for (;;) {
-      const keep = 0.55 + this.rand() * 0.4, extra = 0.04 + this.rand() * 0.12;
+      const keep = 0.45 + this.rand() * 0.35, extra = 0.02 + this.rand() * 0.06;
       const quad = Array.from({ length: H }, () => Array.from({ length: W }, () => this.rand()));
       const g = [];
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -53,7 +53,7 @@ export class Game {
   }
 
   reset() {
-    this.grid = this.makeWalls().map(c => (c === '.' && this.rand() < 0.7 ? '+' : c));
+    this.grid = this.makeWalls().map(c => (c === '.' && this.rand() < 0.5 ? '+' : c));
     this.bombs = []; this.flames = []; this.items.clear(); this.overT = 0; this.msg = ''; this.round++; this.roundT = 0;
     [...this.players.values()].forEach((p, i) => {
       Object.assign(p, { alive: i < SPAWNS.length, maxBombs: 1, range: 1, delay: 0.2, m: null });
