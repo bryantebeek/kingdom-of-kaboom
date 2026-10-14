@@ -143,3 +143,14 @@ test('two characters never share a tile', () => {
   }
   expect([a.x, b.x]).toEqual([2, 3]); // a claimed the middle tile first; b stays put
 });
+
+test('remote players join once with a clean name, then send inputs', () => {
+  const g = new Game();
+  g.receive('a', { t: 'join', name: '  Lancelot of the Very Long Name ' });
+  g.receive('a', { t: 'join', name: 'Impostor' });
+  g.receive('b', { t: 'join' });
+  g.receive('a', null);
+  g.receive('a', { t: 'dir', d: 'left' });
+  expect([...g.players.values()].map(p => p.name)).toEqual(['Lancelot of the ', 'anon']);
+  expect(g.players.get('a').dir).toBe('left');
+});

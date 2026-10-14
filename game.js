@@ -87,7 +87,19 @@ export class Game {
     if ([...this.players.values()].filter(p => p.alive).length <= 1) this.reset();
   }
 
-  leave(id) { this.players.delete(id); }
+  leave(id) {
+    const p = this.players.get(id);
+    if (p) this.ev.push({ e: 'leave', n: p.name, c: p.color });
+    this.players.delete(id);
+  }
+
+  // One message from a remote player (Bun server or browser host): join once, then inputs.
+  receive(id, m) {
+    if (m?.t !== 'join' || this.players.has(id)) return m && this.input(id, m);
+    this.join(id, String(m.name || 'anon').trim().slice(0, 16) || 'anon');
+    const p = this.players.get(id);
+    this.ev.push({ e: 'join', n: p.name, c: p.color });
+  }
 
   input(id, m) {
     const p = this.players.get(id);

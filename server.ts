@@ -21,9 +21,7 @@ const server = Bun.serve<{ id: string }>({
     message(ws, raw) {
       let m;
       try { m = JSON.parse(String(raw)); } catch { return; }
-      if (m?.t === 'join' && !game.players.has(ws.data.id))
-        game.join(ws.data.id, String(m.name || 'anon').trim().slice(0, 16) || 'anon');
-      else if (m) game.input(ws.data.id, m);
+      game.receive(ws.data.id, m);
     },
     close(ws) { game.leave(ws.data.id); },
   },
