@@ -154,3 +154,21 @@ test('remote players join once with a clean name, then send inputs', () => {
   expect([...g.players.values()].map(p => p.name)).toEqual(['Lancelot of the ', 'anon']);
   expect(g.players.get('a').dir).toBe('left');
 });
+
+test('a newcomer resets the scores; someone rejoining keeps theirs', () => {
+  const g = new Game();
+  g.receive('a', { t: 'join', name: 'A', key: 'ka' });
+  g.receive('b', { t: 'join', name: 'B', key: 'kb' });
+  g.players.get('a').score = 3;
+  g.players.get('b').score = 2;
+  g.leave('b');
+  g.receive('b2', { t: 'join', name: 'B', key: 'kb' }); // same person, new connection
+  expect([g.players.get('a').score, g.players.get('b2').score]).toEqual([3, 2]);
+  g.leave('b2');
+  g.receive('c', { t: 'join', name: 'C', key: 'kc' }); // someone new
+  expect([g.players.get('a').score, g.players.get('c').score]).toEqual([0, 0]);
+  g.receive('b3', { t: 'join', name: 'B', key: 'kb' }); // was away for the reset: starts over too, but isn't new
+  g.players.get('a').score = 1;
+  expect(g.players.get('b3').score).toBe(0);
+  expect(g.players.get('a').score).toBe(1);
+});

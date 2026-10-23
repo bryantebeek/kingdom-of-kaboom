@@ -1023,6 +1023,7 @@ const roomPeer = r => `kingdom-of-kaboom-${r}`; // the public broker is shared w
 const roomUrl = r => `${location.origin}${location.pathname}?room=${r}`;
 const anyOf = a => a[Math.floor(Math.random() * a.length)];
 const newRoom = () => `${anyOf(['brave', 'grim', 'golden', 'iron', 'wild', 'royal', 'shadow', 'merry'])}-${anyOf(['dragon', 'griffin', 'keep', 'tankard', 'wyvern', 'goblin', 'crown', 'banner'])}-${Math.floor(rnd(10, 100))}`;
+const key = localStorage.kokKey ??= crypto.randomUUID(); // who we are across reconnects, so the host keeps our score
 const BOTS = ['Sir Bedivere', 'Grimbold', 'Elowen']; // knight, mage, barbarian
 const status = (el, cls, html) => { $(el).className = `status ${cls}`; $(el).lastElementChild.innerHTML = html; };
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -1072,7 +1073,7 @@ function joinRoom(room) {
     peer.on('error', e => fail(e.type === 'peer-unavailable' ? 'The host just left.' : "Couldn't reach the host."));
   }, () => fail("Couldn't load the multiplayer module."));
   send = m => conn?.open && conn.send(m);
-  start = name => send({ t: 'join', name });
+  start = name => send({ t: 'join', name, key });
 }
 if (online) {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
@@ -1084,7 +1085,7 @@ if (online) {
     else apply(m);
   };
   ws.onclose = () => { ws.onmessage = null; notice('CONNECTION LOST', 'Disconnected', 'The server stopped answering.'); };
-  start = name => ready.then(() => send({ t: 'join', name }));
+  start = name => ready.then(() => send({ t: 'join', name, key }));
 } else {
   const game = new Game(), bots = [], guests = new Set();
   game.reset(); // an arena to look at behind the title screen

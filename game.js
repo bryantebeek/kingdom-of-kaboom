@@ -16,6 +16,7 @@ export class Game {
   bombs = [];
   flames = [];
   items = new Map(); // tile -> 'b' +bomb, 'r' +range, 's' +speed
+  known = new Map(); // player key -> score: someone who leaves and comes back keeps theirs
   roundSize = 0;
   round = 0;
   ev = []; // one-shot events for client effects, drained by snapshot()
@@ -76,26 +77,34 @@ export class Game {
     this.roundSize = [...this.players.values()].filter(p => p.alive).length;
   }
 
-  join(id, name) {
+  // `key` stays the same when a player reconnects (a new connection id doesn't make a new person).
+  join(id, name, key = id) {
+    if (!this.known.has(key)) { // a newcomer: everyone starts over on equal terms
+      for (const p of this.players.values()) p.score = 0;
+      for (const k of this.known.keys()) this.known.set(k, 0);
+    }
     const used = new Set([...this.players.values()].map(p => p.color));
     this.players.set(id, {
-      id, name, color: COLORS.find(c => !used.has(c)) ?? '#888', x: 0, y: 0, alive: false,
-      maxBombs: 1, range: 1, delay: 0.2, dir: null, m: null, score: 0,
+      id, key, name, color: COLORS.find(c => !used.has(c)) ?? '#888', x: 0, y: 0, alive: false,
+      maxBombs: 1, range: 1, delay: 0.2, dir: null, m: null, score: this.known.get(key) ?? 0,
     });
+    this.known.set(key, this.players.get(id).score);
     // nobody to fight yet: start fresh; otherwise wait for next round
     if ([...this.players.values()].filter(p => p.alive).length <= 1) this.reset();
   }
 
   leave(id) {
     const p = this.players.get(id);
-    if (p) this.ev.push({ e: 'leave', n: p.name, c: p.color });
+    if (!p) return;
+    this.known.set(p.key, p.score);
+    this.ev.push({ e: 'leave', n: p.name, c: p.color });
     this.players.delete(id);
   }
 
   // One message from a remote player (Bun server or browser host): join once, then inputs.
   receive(id, m) {
     if (m?.t !== 'join' || this.players.has(id)) return m && this.input(id, m);
-    this.join(id, String(m.name || 'anon').trim().slice(0, 16) || 'anon');
+    this.join(id, String(m.name || 'anon').trim().slice(0, 16) || 'anon', m.key ? String(m.key).slice(0, 64) : id);
     const p = this.players.get(id);
     this.ev.push({ e: 'join', n: p.name, c: p.color });
   }
