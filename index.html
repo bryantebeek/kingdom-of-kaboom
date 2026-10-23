@@ -1010,39 +1010,50 @@ function hud(s) {
   $('spec').textContent = hud.aliveIn === s.round ? 'FALLEN — AWAITING NEXT ROUND' : 'SPECTATING — THOU JOINEST NEXT ROUND';
 }
 
-// ---------- game loop: local with bots (static hosting), ?join=<host> for a friend's browser, or ?online for the multiplayer server ----------
-// Peer to peer: the inviting browser runs the Game exactly like server.ts and streams snapshots over WebRTC.
+// ---------- game loop: local with bots (static hosting), ?room=<slug> for a war party, or ?online for the multiplayer server ----------
+// Peer to peer: the hosting browser runs the Game exactly like server.ts and streams snapshots over WebRTC.
 // The public PeerJS broker only introduces the browsers. ponytail: STUN only, so some strict NATs/corporate
 // networks can't connect; add a TURN server to `new Peer({ config })` if friends report that.
+// A room is a fixed link: the first browser to open it claims the room's peer id and hosts, everyone after joins.
 const PEERJS = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/+esm';
-const params = new URLSearchParams(location.search), online = params.has('online'), hostId = params.get('join');
+const params = new URLSearchParams(location.search), online = params.has('online');
+const slug = s => s?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || null;
+const linkRoom = slug(params.get('room'));
+const roomPeer = r => `kingdom-of-kaboom-${r}`; // the public broker is shared with other apps
+const roomUrl = r => `${location.origin}${location.pathname}?room=${r}`;
+const anyOf = a => a[Math.floor(Math.random() * a.length)];
+const newRoom = () => `${anyOf(['brave', 'grim', 'golden', 'iron', 'wild', 'royal', 'shadow', 'merry'])}-${anyOf(['dragon', 'griffin', 'keep', 'tankard', 'wyvern', 'goblin', 'crown', 'banner'])}-${Math.floor(rnd(10, 100))}`;
 const BOTS = ['Sir Bedivere', 'Grimbold', 'Elowen']; // knight, mage, barbarian
 const status = (el, cls, html) => { $(el).className = `status ${cls}`; $(el).lastElementChild.innerHTML = html; };
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const retry = `<a href="">Try again</a> or <a href="${location.pathname}">play vs bots →</a>`;
 function notice(small, big, text) {
   $('noticeSmall').textContent = small; $('noticeBig').textContent = big; $('noticeText').textContent = text;
   $('soloLink').href = location.pathname;
   $('notice').hidden = false;
 }
-let foes = 2, mode = 'solo', send, start, party;
-if (online || hostId) $('modes').hidden = $('foes').hidden = $('invite').hidden = true;
-if (hostId) {
-  $('summons').hidden = false;
+let foes = 2, mode = 'solo', send, start, party, guest = false;
+if (online) $('modes').hidden = $('foes').hidden = $('invite').hidden = true;
+// Someone already hosts this room: stop the local arena and play in theirs.
+function joinRoom(room) {
+  guest = true;
+  party = null;
+  $('foes').hidden = $('invite').hidden = true;
   $('go').textContent = 'JOIN BATTLE';
-  $('go').disabled = true;
+  status('sumStatus', 'wait', "Riding to the host's keep…");
   let conn, done = false, heard = 0;
   const fail = why => {
     if (done) return;
     done = true;
-    if (joined) return notice('THE BATTLE IS OVER', 'Host Departed', `${why} Raise thine own banner, or try the link again.`);
+    if (joined) return notice('THE BATTLE IS OVER', 'Host Departed', `${why} Try again: the first to return hosts the room.`);
     $('go').disabled = true;
-    status('sumStatus', 'err', `${why} <a href="${location.pathname}">Play vs bots →</a>`);
+    status('sumStatus', 'err', `${why} ${retry}`);
   };
   import(PEERJS).then(({ Peer }) => {
     const peer = new Peer();
     peer.on('open', id => {
       myId = id; // the host uses our peer id as the player id
-      conn = peer.connect(hostId, { serialization: 'json' });
+      conn = peer.connect(roomPeer(room), { serialization: 'json' });
       conn.on('open', () => { $('go').disabled = false; });
       conn.on('data', s => {
         heard = performance.now();
@@ -1058,11 +1069,12 @@ if (hostId) {
         if (heard && performance.now() - heard > 5000) fail("The host's game stopped answering.");
       }, 1000);
     });
-    peer.on('error', e => fail(e.type === 'peer-unavailable' ? 'This battle has ended, or the link is wrong.' : "Couldn't reach the host."));
+    peer.on('error', e => fail(e.type === 'peer-unavailable' ? 'The host just left.' : "Couldn't reach the host."));
   }, () => fail("Couldn't load the multiplayer module."));
   send = m => conn?.open && conn.send(m);
   start = name => send({ t: 'join', name });
-} else if (online) {
+}
+if (online) {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
   const ready = new Promise(r => { ws.onopen = r; });
   send = m => ws.readyState === 1 && ws.send(JSON.stringify(m));
@@ -1080,25 +1092,38 @@ if (hostId) {
   const allies = () => guests.size
     ? status('partyStatus', 'ok', `${plural(guests.size, 'ally', 'allies')} in the arena`)
     : status('partyStatus', 'wait', 'Awaiting allies…');
-  let link;
-  // Open the war party panel; the first time, register with the broker so friends can connect to this tab.
+  let link, room = linkRoom;
+  // Claim the room's id on the broker so friends can connect to this tab; fails with 'unavailable-id' if it's already hosted.
+  const host = () => link ??= import(PEERJS).then(({ Peer }) => new Promise((ok, no) => {
+    const peer = new Peer(roomPeer(room ??= newRoom()));
+    peer.on('open', () => { history.replaceState(null, '', roomUrl(room)); ok(roomUrl(room)); }); // reload or bookmark keeps the room
+    peer.on('error', e => peer.open || no(e)); // later errors are one guest's problem, not the party's
+    peer.on('disconnected', () => peer.reconnect()); // broker dropped us: games in progress keep running, new guests need it back
+    peer.on('connection', c => {
+      c.on('open', () => { c.heard = performance.now(); guests.add(c); allies(); });
+      c.on('data', m => { c.heard = performance.now(); game.receive(c.peer, m); });
+      c.on('close', () => { guests.delete(c); game.leave(c.peer); allies(); });
+    });
+  }));
+  // Open the war party panel; the first time, also claim the room.
   party = () => {
     $('party').hidden = false;
-    link ??= import(PEERJS).then(({ Peer }) => new Promise((ok, no) => {
-      const peer = new Peer();
-      peer.on('open', id => ok(`${location.origin}${location.pathname}?join=${id}`));
-      peer.on('error', e => peer.open || no(e)); // later errors are one guest's problem, not the party's
-      peer.on('disconnected', () => peer.reconnect()); // broker dropped us: games in progress keep running, new guests need it back
-      peer.on('connection', c => {
-        c.on('open', () => { c.heard = performance.now(); guests.add(c); allies(); });
-        c.on('data', m => { c.heard = performance.now(); game.receive(c.peer, m); });
-        c.on('close', () => { guests.delete(c); game.leave(c.peer); allies(); });
-      });
-    })).then(url => { $('partyLink').value = url; allies(); }, () => {
-      link = null;
+    host().then(url => { $('partyLink').value = url; allies(); }, () => {
+      link = null; room = linkRoom; // a made-up name that clashed gets a fresh one on retry
       status('partyStatus', 'err', "Couldn't raise the banner. Press <kbd>I</kbd> twice to retry.");
     });
   };
+  if (linkRoom) { // a room link: host it if it's empty, join it if not
+    $('modes').hidden = true;
+    $('summons').hidden = false;
+    $('go').disabled = true;
+    status('sumStatus', 'wait', 'Seeking the room…');
+    host().then(() => {
+      document.querySelector('#modes [data-mode="host"]').click();
+      $('go').disabled = false;
+      status('sumStatus', 'ok', `Room <b>${linkRoom}</b> stands empty: thou art its host`);
+    }, e => e.type === 'unavailable-id' ? joinRoom(linkRoom) : status('sumStatus', 'err', `Couldn't reach the room. ${retry}`));
+  }
   start = name => {
     myId = 'me';
     game.join(myId, name.trim().slice(0, 16) || 'Hero');
@@ -1109,6 +1134,7 @@ if (hostId) {
     if (mode === 'host') party();
   };
   setInterval(() => {
+    if (guest) return; // playing in someone else's room
     for (const b of bots) botThink(game, b);
     game.tick(1 / 30);
     const s = game.snapshot(); // drains one-shot events, so everyone gets this same copy
