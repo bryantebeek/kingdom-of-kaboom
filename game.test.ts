@@ -99,15 +99,27 @@ test('bot-only matches keep fighting and rounds keep ending', () => {
     if (!before && g.overT) rounds++;
   }
   expect(booms).toBeGreaterThan(100); // bots keep bombing: no passive stand-offs
-  expect(rounds).toBeGreaterThanOrEqual(3); // and rounds end (by a win or the clock)
+  expect(rounds).toBeGreaterThanOrEqual(3); // and rounds end: no clock, so someone has to win
 });
 
-test('rounds time out as a draw', () => {
+test('with no crates left, potions keep appearing on open floor, faster and faster', () => {
   const g = new Game();
   g.join('a', 'A');
   g.join('b', 'B');
-  for (let t = 0; t < 181; t += 1) g.tick(1);
-  expect(g.snapshot().msg).toBe("Time's up!");
+  g.grid = classic(g);
+  const [a, b] = g.players.values();
+  Object.assign(a, { x: 1, y: 1 });
+  Object.assign(b, { x: 13, y: 11 });
+  const at = [];
+  for (let t = 0; t < 20; t += 1 / 30) {
+    const n = g.items.size;
+    g.tick(1 / 30);
+    if (g.items.size > n) at.push(t);
+  }
+  expect(at.length).toBeGreaterThan(10);
+  expect(at[1] - at[0]).toBeGreaterThan(at.at(-1) - at.at(-2)); // speeding up
+  for (const [k] of g.items) expect(g.grid[k]).toBe('.');
+  expect(g.overT).toBe(0); // no clock ends the round
 });
 
 test('wall layouts vary, stay symmetric, keep spawns open and everything reachable', () => {

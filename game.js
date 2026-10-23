@@ -4,7 +4,6 @@ const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22'
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' };
 const FLAME = 0.3; // seconds a blast stays deadly
-const ROUND_TIME = 180; // then it's a draw, so a round can't stall forever
 const DROP = 0.5; // chance a crate leaves a potion behind
 
 // Player: { id, name, color, x, y, alive, maxBombs, range, delay, dir, m, score }
@@ -64,7 +63,7 @@ export class Game {
 
   reset() {
     this.grid = this.makeWalls().map(c => (c === '.' && this.rand() < 0.5 ? '+' : c));
-    this.bombs = []; this.flames = []; this.items.clear(); this.overT = 0; this.msg = ''; this.round++; this.roundT = 0;
+    this.bombs = []; this.flames = []; this.items.clear(); this.overT = 0; this.msg = ''; this.round++; this.spawnT = 2; this.spawns = 0;
     [...this.players.values()].forEach((p, i) => {
       Object.assign(p, { alive: i < SPAWNS.length, maxBombs: 1, range: 1, delay: 0.2, m: null });
       if (!p.alive) return; // ponytail: >8 players spectate, add spawns if the team grows
@@ -198,8 +197,16 @@ export class Game {
       this.ev.push({ e: 'kill', v: p.name, vc: p.color, k: k?.name ?? '???', kc: k?.color ?? '#888', self: owner === p.id });
     }
 
+    // Once the crates are gone nothing drops anymore, so potions appear on open floor, faster and
+    // faster: everyone keeps growing until the blasts are too big to dodge and someone wins.
+    if (!this.grid.includes('+') && (this.spawnT -= dt) <= 0) {
+      this.spawnT = Math.max(1, 3 * 0.85 ** ++this.spawns);
+      const hot = new Set(this.flames.map(f => this.idx(f.x, f.y)));
+      const open = this.grid.flatMap((_, k) => this.free(k % W, Math.floor(k / W)) && !this.items.has(k) && !hot.has(k) ? [k] : []);
+      if (open.length) this.items.set(open[Math.floor(this.rand() * open.length)], 'brs'[Math.floor(this.rand() * 3)]);
+    }
+
     const alive = [...this.players.values()].filter(p => p.alive);
-    if ((this.roundT += dt) >= ROUND_TIME) { this.msg = "Time's up!"; this.overT = 3; return; }
     if (this.roundSize >= 2 ? alive.length <= 1 : alive.length === 0) {
       if (alive[0]) { alive[0].score++; this.msg = `${alive[0].name} wins!`; }
       else this.msg = this.roundSize >= 2 ? 'Draw!' : 'Game over';
@@ -237,7 +244,7 @@ export class Game {
     const ev = this.ev;
     this.ev = [];
     return {
-      round: this.round, ev, timeLeft: Math.ceil(ROUND_TIME - this.roundT),
+      round: this.round, ev,
       grid: this.grid.join(''),
       players: [...this.players.values()].map(({ id, name, color, x, y, alive, score, delay, maxBombs, range, m, dir }) =>
         ({ id, name, color, x: +x.toFixed(3), y: +y.toFixed(3), alive, score, delay, maxBombs, range, m, d: dir })),

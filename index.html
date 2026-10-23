@@ -992,7 +992,7 @@ function killFeed(e) {
   toast(e.self ? `${n(e.v, e.vc)}<em>was hoist by their own petard</em>` : `${n(e.k, e.kc)}<em>💥</em>${n(e.v, e.vc)}`);
 }
 function hud(s) {
-  const head = `ROUND ${s.round} · ${Math.floor(s.timeLeft / 60)}:${String(s.timeLeft % 60).padStart(2, '0')}`;
+  const head = `ROUND ${s.round}`;
   if ($('roundNo').textContent !== head) $('roundNo').textContent = head;
   const me = s.players.find(p => p.id === myId);
   const html = [...s.players].sort((a, b) => b.score - a.score).map(p =>
