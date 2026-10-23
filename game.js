@@ -289,15 +289,6 @@ export function botThink(game, id) {
   const nearest = (seen, want) => [...seen].sort((a, b) => a[1].d - b[1].d).find(([k]) => want(k)); // closest first, stops early
 
   const brain = p.bot ??= { calm: true, wait: 0 };
-  if (danger.has(start)) { // run to the closest tile no blast will reach
-    if (brain.calm) { brain.calm = false; brain.wait = 2 + Math.floor(Math.random() * 8); } // human-ish reaction time
-    if (brain.wait-- > 0) return;
-    const seen = reach(passable(danger));
-    const safe = nearest(seen, k => !danger.has(k));
-    return go(safe ? safe[1].dir : null, true);
-  }
-  brain.calm = true;
-
   const enemies = new Set([...game.players.values()].filter(o => o.alive && o !== p).map(o => game.idx(Math.round(o.x), Math.round(o.y))));
   const hits = k => {
     const b = { x: k % W, y: Math.floor(k / W), range: p.range };
@@ -311,12 +302,22 @@ export function botThink(game, id) {
 
   const here = game.idx(Math.round(p.x), Math.round(p.y));
   const mine = game.bombs.filter(b => b.owner === id).length;
+  // Bomb even while fleeing: with bombs to spare, laying another on the way out is how traps happen.
   if (here === start && mine < p.maxBombs && !game.bombAt(sx, sy) && hits(start) && canEscape(start)) {
     game.input(id, { t: 'bomb' });
     const now = game.danger(), safe = nearest(reach(passable(now)), k => !now.has(k));
     brain.calm = false; brain.wait = 0; // it's our own bomb: no reaction delay, run immediately
     return go(safe ? safe[1].dir : null, true);
   }
+
+  if (danger.has(start)) { // run to the closest tile no blast will reach
+    if (brain.calm) { brain.calm = false; brain.wait = 2 + Math.floor(Math.random() * 8); } // human-ish reaction time
+    if (brain.wait-- > 0) return;
+    const seen = reach(passable(danger));
+    const safe = nearest(seen, k => !danger.has(k));
+    return go(safe ? safe[1].dir : null, true);
+  }
+  brain.calm = true;
 
   const seen = reach(k => !danger.has(k)); // stroll only through tiles no bomb threatens
   const goal = nearest(seen, k => game.items.has(k) && seen.get(k).d <= 8)
