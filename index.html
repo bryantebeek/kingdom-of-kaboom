@@ -653,18 +653,25 @@ function makeItem([i, k]) {
   return g;
 }
 
-// ---------- heroes (KayKit Adventurers, CC0 by Kay Lousberg) ----------
+// ---------- heroes (KayKit Adventurers and Skeletons, CC0 by Kay Lousberg) ----------
+// Adventurers carry every weapon in their file: show the listed ones. Skeletons ship bare: strap the
+// listed weapon models to their [right, left] hand, and borrow the Adventurers' animations (same bone names).
 const CLASSES = {
   Knight: ['1H_Sword', 'Round_Shield'], Mage: ['2H_Staff'], Rogue: ['Knife', 'Knife_Offhand'],
   Barbarian: ['1H_Axe', 'Barbarian_Round_Shield'], Rogue_Hooded: ['Knife', 'Knife_Offhand'],
+  Skeleton_Warrior: ['Skeleton_Blade', 'Skeleton_Shield_Large_A'], Skeleton_Mage: ['Skeleton_Staff'],
+  Skeleton_Rogue: ['Skeleton_Crossbow'], Skeleton_Minion: ['Skeleton_Axe', 'Skeleton_Shield_Small_A'],
 };
+const bare = cls => cls.startsWith('Skeleton_');
 const BODY = /^(Knight|Mage|Rogue|Barbarian)_(Helmet|Hat|Cape|Arm|Body|Head|Leg)/;
 const loader = new GLTFLoader(), models = {};
 const loadClass = name => (models[name] ??= loader.loadAsync(`assets/${name}.glb`).then(gltf => {
   const box = new THREE.Box3().setFromObject(gltf.scene);
   return { gltf, scale: 1.15 / (box.max.y - box.min.y) };
 }));
-const classFor = name => Object.keys(CLASSES)[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % 5];
+// Hero clips minus tracks for bones a bare model lacks (the Adventurers rig has extra IK bones).
+const borrowClips = (model, clips) => clips.map(c => new THREE.AnimationClip(c.name, c.duration,
+  c.tracks.filter(t => model.getObjectByName(t.name.slice(0, t.name.lastIndexOf('.'))))));
 
 function label(name, color) {
   const tex = canvasTex(512, 128, g => {
@@ -692,21 +699,28 @@ function makeBomber(p) {
     root.add(ring);
   }
   const u = root.userData = { rig, tag, ring, yaw: 0, yawT: 0, alive: p.alive, drop: p.alive ? 1 : 0, die: -1, color: p.color, state: '', cheer: false };
-  const cls = classFor(p.name);
-  loadClass(cls).then(({ gltf, scale }) => {
+  const cls = Object.keys(CLASSES)[p.look];
+  const kit = bare(cls) ? [loadClass('Knight'), ...CLASSES[cls].map(loadClass)] : [];
+  Promise.all([loadClass(cls), ...kit]).then(([{ gltf, scale }, hero, ...weapons]) => {
     const model = cloneSkinned(gltf.scene), cape = new THREE.MeshStandardMaterial({ color: p.color, roughness: .85 });
     model.scale.setScalar(scale);
+    weapons.forEach((w, i) => {
+      const g = w.gltf.scene.clone();
+      if (!i) g.rotation[CLASSES[cls][0] === 'Skeleton_Staff' ? 'x' : 'y'] = Math.PI; // gripped like the heroes' sword; the staff flips so its skull points up
+      model.getObjectByName(['handslotr', 'handslotl'][i]).add(g);
+    });
     model.traverse(o => {
       if (!o.isMesh) return;
-      o.visible = CLASSES[cls].includes(o.name) || BODY.test(o.name) || BODY.test(o.parent?.name ?? '');
+      o.visible = bare(cls) || CLASSES[cls].includes(o.name) || BODY.test(o.name) || BODY.test(o.parent?.name ?? '');
       o.castShadow = true;
       o.frustumCulled = false; // skinned bounds are stale once animated
-      if (/_Cape$/.test(o.name) || /_Cape$/.test(o.parent?.name ?? '')) o.material = cape;
+      if (/_(Cape|Cloak)$/.test(o.name) || /_(Cape|Cloak)$/.test(o.parent?.name ?? '')) o.material = cape;
     });
     rig.add(model);
     u.bones = ['hips', 'spine', 'chest', 'head'].map(n => model.getObjectByName(n)).filter(Boolean); // death motes rise from the body
     u.mixer = new THREE.AnimationMixer(model);
-    u.actions = Object.fromEntries(['Idle', 'Running_A', 'Death_A', 'Cheer', 'Jump_Land'].map(n => [n, u.mixer.clipAction(THREE.AnimationClip.findByName(gltf.animations, n))]));
+    const clips = hero ? borrowClips(model, hero.gltf.animations) : gltf.animations;
+    u.actions = Object.fromEntries(['Idle', 'Running_A', 'Death_A', 'Cheer', 'Jump_Land'].map(n => [n, u.mixer.clipAction(THREE.AnimationClip.findByName(clips, n))]));
     for (const n of ['Death_A', 'Jump_Land']) { u.actions[n].setLoop(THREE.LoopOnce); u.actions[n].clampWhenFinished = true; }
   });
   root.position.set(p.x, 0, p.y);
@@ -1050,7 +1064,7 @@ const roomUrl = r => `${location.origin}${location.pathname}?room=${r}`;
 const anyOf = a => a[Math.floor(Math.random() * a.length)];
 const newRoom = () => `${anyOf(['brave', 'grim', 'golden', 'iron', 'wild', 'royal', 'shadow', 'merry'])}-${anyOf(['dragon', 'griffin', 'keep', 'tankard', 'wyvern', 'goblin', 'crown', 'banner'])}-${Math.floor(rnd(10, 100))}`;
 const key = localStorage.kokKey ??= crypto.randomUUID(); // who we are across reconnects, so the host keeps our score
-const BOTS = ['Sir Bedivere', 'Grimbold', 'Elowen']; // knight, mage, barbarian
+const BOTS = ['Sir Bedivere', 'Grimbold', 'Elowen'];
 const status = (el, cls, html) => { $(el).className = `status ${cls}`; $(el).lastElementChild.innerHTML = html; };
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const retry = `<a href="">Try again</a> or <a href="${location.pathname}">play vs bots →</a>`;

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { Game, W, botThink } from './game';
+import { Game, W, HEROES, botThink } from './game';
 
 // Walls are random per round; tests that depend on exact tiles use the classic pillar grid.
 const classic = g => g.grid.map((_, i) => {
@@ -202,4 +202,12 @@ test('first to N wins the tourney: podium for the top 3, then a fresh tourney', 
   for (let t = 0; t < 10.1; t += 0.1) g.tick(0.1);
   expect(g.podium).toBeNull();
   expect([...g.players.values()].map(p => p.score)).toEqual([0, 0, 0, 0]);
+});
+
+test('every player gets a different hero until they run out', () => {
+  const g = new Game();
+  for (let i = 0; i < HEROES; i++) g.join(`p${i}`, `P${i}`);
+  expect(new Set([...g.players.values()].map(p => p.look)).size).toBe(HEROES);
+  g.join('extra', 'Extra');
+  expect(g.players.get('extra').look).toBeLessThan(HEROES);
 });

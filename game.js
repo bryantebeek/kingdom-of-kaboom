@@ -1,5 +1,6 @@
 export const W = 15, H = 13;
 const SPAWNS = [[1, 1], [13, 11], [13, 1], [1, 11], [7, 1], [7, 11], [1, 5], [13, 5]];
+export const HEROES = 9; // character models the client has (index into its CLASSES)
 const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#ecf0f1'];
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' };
@@ -90,9 +91,11 @@ export class Game {
       for (const p of this.players.values()) p.score = 0;
       for (const k of this.known.keys()) this.known.set(k, 0);
     }
-    const used = new Set([...this.players.values()].map(p => p.color));
+    const used = new Set([...this.players.values()].map(p => p.color)), worn = new Set([...this.players.values()].map(p => p.look));
+    const looks = [...Array(HEROES).keys()].filter(i => !worn.has(i)); // nobody looks alike until all heroes are taken
     this.players.set(id, {
-      id, key, name, color: COLORS.find(c => !used.has(c)) ?? '#888', x: 0, y: 0, alive: false,
+      id, key, name, color: COLORS.find(c => !used.has(c)) ?? '#888', look: looks[Math.floor(this.rand() * looks.length)] ?? Math.floor(this.rand() * HEROES),
+      x: 0, y: 0, alive: false,
       maxBombs: 1, range: 1, delay: 0.2, dir: null, m: null, score: this.known.get(key) ?? 0,
     });
     this.known.set(key, this.players.get(id).score);
@@ -267,8 +270,8 @@ export class Game {
     return {
       round: this.round, ev, firstTo: this.firstTo, podium: this.podium,
       grid: this.grid.join(''),
-      players: [...this.players.values()].map(({ id, name, color, x, y, alive, score, delay, maxBombs, range, m, dir }) =>
-        ({ id, name, color, x: +x.toFixed(3), y: +y.toFixed(3), alive, score, delay, maxBombs, range, m, d: dir })),
+      players: [...this.players.values()].map(({ id, name, color, look, x, y, alive, score, delay, maxBombs, range, m, dir }) =>
+        ({ id, name, color, look, x: +x.toFixed(3), y: +y.toFixed(3), alive, score, delay, maxBombs, range, m, d: dir })),
       bombs: this.bombs.map(({ id, x, y, t }) => ({ id, x, y, t: Math.round(t * 100) / 100 })),
       flames: this.flames.map(f => [f.x, f.y]),
       items: [...this.items],
