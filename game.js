@@ -5,6 +5,7 @@ const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' };
 const FLAME = 0.3; // seconds a blast stays deadly
 const DROP = 0.5; // chance a crate leaves a potion behind
+export const PODIUM = [[7, 6], [6, 6], [8, 6]]; // 1st, 2nd, 3rd: mid-arena, silver on the left as the camera sees it
 
 // Player: { id, name, color, x, y, alive, maxBombs, range, delay, dir, m, score }
 // x/y are floats: players glide between tile centers, `m` is the current glide direction.
@@ -17,6 +18,8 @@ export class Game {
   items = new Map(); // tile -> 'b' +bomb, 'r' +range, 's' +speed
   known = new Map(); // player key -> score: someone who leaves and comes back keeps theirs
   roundSize = 0;
+  firstTo = 0; // tourney: first to this many round wins takes the podium (0 = endless rounds)
+  podium = null; // ids of the top 3 while the tourney's podium is up
   round = 0;
   ev = []; // one-shot events for client effects, drained by snapshot()
   overT = 0;
@@ -62,6 +65,11 @@ export class Game {
   }
 
   reset() {
+    if (this.podium) { // the podium came down: a fresh tourney, everyone (even those away) back to 0
+      for (const p of this.players.values()) p.score = 0;
+      for (const k of this.known.keys()) this.known.set(k, 0);
+      this.podium = null;
+    }
     this.grid = this.makeWalls().map(c => (c === '.' && this.rand() < 0.5 ? '+' : c));
     this.bombs = []; this.flames = []; this.items.clear(); this.overT = 0; this.msg = ''; this.round++; this.spawnT = 2; this.spawns = 0;
     [...this.players.values()].forEach((p, i) => {
@@ -211,7 +219,20 @@ export class Game {
       if (alive[0]) { alive[0].score++; this.msg = `${alive[0].name} wins!`; }
       else this.msg = this.roundSize >= 2 ? 'Draw!' : 'Game over';
       this.overT = 3;
+      if (this.firstTo && alive[0]?.score >= this.firstTo) this.crown(alive[0]);
     }
+  }
+
+  // Tourney over: clear the arena and stand the top 3 on the podium tiles until the next tourney.
+  crown(champ) {
+    const top = [...this.players.values()].sort((a, b) => b.score - a.score).slice(0, PODIUM.length);
+    this.grid = this.grid.map((_, k) => (k % W === 0 || k % W === W - 1 || k < W || k >= W * (H - 1) ? '#' : '.'));
+    this.bombs = []; this.flames = []; this.items.clear();
+    for (const p of this.players.values()) Object.assign(p, { alive: false, m: null });
+    top.forEach((p, i) => { [p.x, p.y] = PODIUM[i]; p.alive = true; });
+    this.podium = top.map(p => p.id);
+    this.msg = `${champ.name} is champion!`;
+    this.overT = 10;
   }
 
   // Tiles a bomb's flames will reach (stops at walls, includes the first crate).
@@ -244,7 +265,7 @@ export class Game {
     const ev = this.ev;
     this.ev = [];
     return {
-      round: this.round, ev,
+      round: this.round, ev, firstTo: this.firstTo, podium: this.podium,
       grid: this.grid.join(''),
       players: [...this.players.values()].map(({ id, name, color, x, y, alive, score, delay, maxBombs, range, m, dir }) =>
         ({ id, name, color, x: +x.toFixed(3), y: +y.toFixed(3), alive, score, delay, maxBombs, range, m, d: dir })),

@@ -184,3 +184,22 @@ test('a newcomer resets the scores; someone rejoining keeps theirs', () => {
   expect(g.players.get('b3').score).toBe(0);
   expect(g.players.get('a').score).toBe(1);
 });
+
+test('first to N wins the tourney: podium for the top 3, then a fresh tourney', () => {
+  const g = new Game();
+  for (const id of ['a', 'b', 'c', 'd']) g.join(id, id.toUpperCase());
+  g.firstTo = 2;
+  const [a, b, c, d] = g.players.values();
+  Object.assign(b, { score: 1 }); Object.assign(c, { score: 0 }); Object.assign(d, { score: 1 });
+  a.score = 1;
+  for (const p of [b, c, d]) p.alive = false; // a wins this round: 2 wins
+  g.tick(1 / 30);
+  expect(a.score).toBe(2);
+  expect(g.podium).toEqual(['a', 'b', 'd']); // ties keep join order
+  expect(g.snapshot().msg).toBe('A is champion!');
+  expect(g.grid.includes('+')).toBe(false); // arena cleared for the ceremony
+  expect([a.x, a.y, a.alive, c.alive]).toEqual([7, 6, true, false]);
+  for (let t = 0; t < 10.1; t += 0.1) g.tick(0.1);
+  expect(g.podium).toBeNull();
+  expect([...g.players.values()].map(p => p.score)).toEqual([0, 0, 0, 0]);
+});

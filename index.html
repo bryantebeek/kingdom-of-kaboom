@@ -138,7 +138,7 @@
 </head>
 <body>
 <div id="feed"></div>
-<div id="board" class="panel"><h3><span>CHAMPIONS</span><span id="roundNo"></span></h3><div id="rows"></div></div>
+<div id="board" class="panel"><h3><span id="boardTitle">CHAMPIONS</span><span id="roundNo"></span></h3><div id="rows"></div></div>
 <div id="stats" class="panel" hidden></div>
 <div id="spec" hidden>FALLEN — AWAITING NEXT ROUND</div>
 <div id="banner"></div>
@@ -163,6 +163,7 @@
     <div class="status wait" id="sumStatus"><i></i><span>Riding to the host's keep…</span></div></div>
   <form class="panel"><input id="name" placeholder="Thy name, hero" maxlength="16" required autofocus autocomplete="off"><button id="go">TO BATTLE</button></form>
   <div class="foes" id="foes"><span id="foesLabel">OPPONENTS</span><button type="button" data-n="0" hidden>0</button><button type="button" data-n="1">1</button><button type="button" data-n="2" class="on">2</button><button type="button" data-n="3">3</button></div>
+  <div class="foes" id="tourney" hidden><span>FIRST TO</span><button type="button" data-t="0" title="Endless rounds">∞</button><button type="button" data-t="1">1</button><button type="button" data-t="2">2</button><button type="button" data-t="3" class="on">3</button></div>
   <div class="keys"><span><kbd>WASD</kbd><kbd>↑↓←→</kbd>move</span><span><kbd>SPACE</kbd>drop bomb</span><span><kbd>M</kbd>mute</span></div>
 </div>
 <script type="module">
@@ -173,7 +174,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { Game, botThink } from './game.js';
+import { Game, botThink, PODIUM } from './game.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
@@ -386,6 +387,18 @@ const runeTex = canvasTex(128, 128, g => {
   for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; g.fillStyle = '#fff'; g.fillRect(64 + Math.cos(a) * 47 - 2, 64 + Math.sin(a) * 47 - 2, 4, 4); }
 });
 const pillarGeo = new RoundedBoxGeometry(.94, 1, .94, 3, .06), pillarMat = stone(); // inner walls: rebuilt every round
+// Tourney podium on the cleared arena: gold in the middle, silver and bronze beside it, rank on the front.
+const PODIUM_H = [.75, .5, .3], PODIUM_C = ['#e8c170', '#c9ccd6', '#c0793e'];
+const podium = new THREE.Group();
+podium.visible = false;
+scene.add(podium);
+PODIUM.forEach(([x, z], i) => {
+  const h = PODIUM_H[i], step = add(new THREE.Mesh(new RoundedBoxGeometry(.96, h, .96, 3, .05), metal(PODIUM_C[i], .3)), x, h / 2, z, podium);
+  const rank = canvasTex(128, 128, g => { g.font = '900 104px Cinzel'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#2a1406'; g.fillText(i + 1, 64, 70); });
+  const n = Math.min(.45, h * .85), face = new THREE.Mesh(new THREE.PlaneGeometry(n, n), new THREE.MeshBasicMaterial({ map: rank, transparent: true }));
+  face.position.z = .485;
+  step.add(face);
+});
 instanced(new RoundedBoxGeometry(1, .7, 1, 3, .04), stone(), border, .35);
 instanced(new THREE.BoxGeometry(.42, .32, .42), stone(.4, .4), merlons, .86);
 
@@ -952,6 +965,14 @@ function apply(s) {
     if (!p.alive && u.die < 0) g.visible = false;
     u.alive = p.alive;
   });
+  if (s.podium && !podium.visible) PODIUM.forEach(([x, z], i) => sparks(x, PODIUM_H[i] + .3, z, 40, hdr(PODIUM_C[i], 4).toArray(), 5));
+  podium.visible = !!s.podium;
+  for (const [id, g] of players) { // the top 3 drop onto their steps, face the camera and cheer
+    const u = g.userData, i = s.podium?.indexOf(id) ?? -1;
+    if (i < 0) { u.lift = 0; continue; }
+    if (!u.lift) { g.position.set(PODIUM[i][0], 0, PODIUM[i][1]); u.drop = 1; }
+    Object.assign(u, { lift: PODIUM_H[i], yawT: 0, d: null, cheer: true });
+  }
   sync(bombs, s.bombs, b => b.id, makeBomb, (g, b) => { g.userData.t = b.t; });
   sync(flames, s.flames, f => f + '', makeFlame);
   sync(items, s.items, ([i, k]) => i + k, makeItem);
@@ -969,7 +990,11 @@ function apply(s) {
   }
 
   if (s.msg && s.msg !== lastMsg) for (const p of s.players) if (p.alive && players.get(p.id)) players.get(p.id).userData.cheer = true;
-  if (s.msg && s.msg !== lastMsg) { banner(s.msg.replace(/!$/, ''), s.msg.includes('wins') ? 'VICTORY' : 'ROUND OVER'); sfx.win(); }
+  if (s.msg && s.msg !== lastMsg) {
+    if (s.podium) banner(s.players.find(p => p.id === s.podium[0])?.name ?? '', 'CHAMPION OF THE TOURNEY');
+    else banner(s.msg.replace(/!$/, ''), s.msg.includes('wins') ? 'VICTORY' : 'ROUND OVER');
+    sfx.win();
+  }
   lastMsg = s.msg;
   hud(s);
 }
@@ -992,8 +1017,9 @@ function killFeed(e) {
   toast(e.self ? `${n(e.v, e.vc)}<em>was hoist by their own petard</em>` : `${n(e.k, e.kc)}<em>💥</em>${n(e.v, e.vc)}`);
 }
 function hud(s) {
-  const head = `ROUND ${s.round}`;
+  const head = `ROUND ${s.round}`, title = s.firstTo ? `FIRST TO ${s.firstTo}` : 'CHAMPIONS';
   if ($('roundNo').textContent !== head) $('roundNo').textContent = head;
+  if ($('boardTitle').textContent !== title) $('boardTitle').textContent = title;
   const me = s.players.find(p => p.id === myId);
   const html = [...s.players].sort((a, b) => b.score - a.score).map(p =>
     `<div class="row${p.id === myId ? ' me' : ''}${p.alive ? '' : ' dead'}"><span class="chip" style="color:${p.color}"></span><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span></div>`,
@@ -1006,7 +1032,7 @@ function hud(s) {
   $('stats').innerHTML = [[ITEMS.b, me.maxBombs], [ITEMS.r, me.range], [ITEMS.s, Math.round((0.2 - me.delay) / 0.025) + 1]]
     .map(([it, v]) => `<div class="stat"><img src="${it.url}">${v}</div>`).join('');
   if (me.alive) hud.aliveIn = s.round;
-  $('spec').hidden = me.alive;
+  $('spec').hidden = me.alive || !!s.podium;
   $('spec').textContent = hud.aliveIn === s.round ? 'FALLEN — AWAITING NEXT ROUND' : 'SPECTATING — THOU JOINEST NEXT ROUND';
 }
 
@@ -1033,7 +1059,7 @@ function notice(small, big, text) {
   $('soloLink').href = location.pathname;
   $('notice').hidden = false;
 }
-let foes = 2, mode = 'solo', send, start, party, guest = false;
+let foes = 2, firstTo = 3, mode = 'solo', send, start, party, guest = false;
 if (online) $('modes').hidden = $('foes').hidden = $('invite').hidden = true;
 // Someone already hosts this room: stop the local arena and play in theirs.
 function joinRoom(room) {
@@ -1129,6 +1155,7 @@ if (online) {
     myId = 'me';
     game.join(myId, name.trim().slice(0, 16) || 'Hero');
     BOTS.slice(0, foes).forEach((b, i) => { game.join(`bot${i}`, b); bots.push(`bot${i}`); });
+    game.firstTo = mode === 'host' ? firstTo : 0; // tourneys are for war parties
     game.round = 0;
     game.reset();
     round = 0; // so the client announces round 1
@@ -1148,13 +1175,19 @@ const pickFoes = n => {
   document.querySelectorAll('#foes button').forEach(o => o.classList.toggle('on', +o.dataset.n === n));
 };
 document.querySelectorAll('#foes button').forEach(b => { b.onclick = () => pickFoes(+b.dataset.n); });
+document.querySelectorAll('#tourney button').forEach(b => {
+  b.onclick = () => {
+    firstTo = +b.dataset.t;
+    document.querySelectorAll('#tourney button').forEach(o => o.classList.toggle('on', o === b));
+  };
+});
 document.querySelectorAll('#modes button').forEach(b => {
   b.onclick = () => {
     mode = b.dataset.mode;
     document.querySelectorAll('#modes button').forEach(o => o.classList.toggle('on', o === b));
     const host = mode === 'host';
     $('foesLabel').textContent = host ? 'BOTS' : 'OPPONENTS';
-    $('foes').querySelector('[data-n="0"]').hidden = !host;
+    $('foes').querySelector('[data-n="0"]').hidden = $('tourney').hidden = !host;
     $('go').textContent = host ? 'HOST BATTLE' : 'TO BATTLE';
     pickFoes(host ? 0 : 2);
     $('name').focus();
@@ -1219,7 +1252,8 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-let camBlend = 0;
+let camBlend = 0, podiumK = 0;
+const podiumCam = new THREE.Vector3(CX, 2.4, CZ + 5.2), podiumLook = new THREE.Vector3(CX, .95, CZ), look = new THREE.Vector3();
 const orbit = new THREE.Vector3(), gameCam = new THREE.Vector3();
 function updateCamera(dt) {
   const fit = Math.max(1, 1.5 / camera.aspect); // pull back on narrow screens
@@ -1227,11 +1261,12 @@ function updateCamera(dt) {
   gameCam.set(CX + Math.sin(time * .25) * .25, 15.5 * fit, CZ + 10.6 * fit);
   if (joined) camBlend = Math.min(1, camBlend + dt * .6);
   const k = camBlend * camBlend * (3 - 2 * camBlend);
-  camera.position.lerpVectors(orbit, gameCam, k);
+  podiumK += ((podium.visible ? 1 : 0) - podiumK) * Math.min(1, dt * 1.5); // swoop in for the ceremony
+  camera.position.lerpVectors(orbit, gameCam, k).lerp(podiumCam, podiumK);
   shake *= Math.exp(-dt * 6);
   camera.position.x += rnd(-1, 1) * shake * .3;
   camera.position.y += rnd(-1, 1) * shake * .3;
-  camera.lookAt(CX, 0, CZ + .7 * k);
+  camera.lookAt(look.set(CX, 0, CZ + .7 * k).lerp(podiumLook, podiumK));
 }
 
 let last = performance.now();
@@ -1256,6 +1291,7 @@ renderer.setAnimationLoop(now => {
     } else if (u.d && u.die < 0) u.yawT = Math.atan2(...DIRV[u.d]); // blocked (e.g. a wall): still turn to face it
     if (Math.abs(tx - g.position.x) + Math.abs(ty - g.position.z) > 1.5) g.position.set(tx, 0, ty);
     else { const k = 1 - Math.exp(-dt * 20); g.position.x += (tx - g.position.x) * k; g.position.z += (ty - g.position.z) * k; }
+    g.position.y = u.lift || 0; // standing on a podium step
     const dy = Math.atan2(Math.sin(u.yawT - u.yaw), Math.cos(u.yawT - u.yaw));
     u.yaw += dy * Math.min(1, dt * 14);
     let y = 0;
