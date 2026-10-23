@@ -5,6 +5,7 @@ const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' };
 const FLAME = 0.3; // seconds a blast stays deadly
 const ROUND_TIME = 180; // then it's a draw, so a round can't stall forever
+const DROP = 0.5; // chance a crate leaves a potion behind
 
 // Player: { id, name, color, x, y, alive, maxBombs, range, delay, dir, m, score }
 // x/y are floats: players glide between tile centers, `m` is the current glide direction.
@@ -124,7 +125,7 @@ export class Game {
       if (this.grid[k] === '+') {
         this.grid[k] = '.';
         this.ev.push({ e: 'block', x, y });
-        if (this.rand() < 0.3) this.items.set(k, 'brs'[Math.floor(this.rand() * 3)]);
+        if (this.rand() < DROP) this.items.set(k, 'brs'[Math.floor(this.rand() * 3)]);
         break;
       }
       this.items.delete(k);
