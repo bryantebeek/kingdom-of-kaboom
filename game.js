@@ -42,21 +42,16 @@ export class Game {
       && ![...this.players.values()].some(q => q !== self && q.alive && this.holds(q, x, y));
   }
 
-  // A fresh wall layout per round: walls scattered at random (20-30% of tiles), point-symmetric
-  // (rotated 180°) so opposite spawns are equally fair. Spawns stay open and every open tile
-  // stays reachable (retried until it is).
+  // A fresh wall layout per round: walls scattered at random (20-30% of tiles), no symmetry.
+  // Spawns stay open and every open tile stays reachable (retried until it is).
   makeWalls() {
-    const N = W * H;
     for (;;) {
-      const density = 0.2 + this.rand() * 0.1, r = Array.from({ length: N }, () => this.rand());
-      const g = r.map((_, k) => {
+      const density = 0.2 + this.rand() * 0.1;
+      const g = Array.from({ length: W * H }, (_, k) => {
         const x = k % W, y = (k - x) / W;
-        return x === 0 || y === 0 || x === W - 1 || y === H - 1 || r[Math.min(k, N - 1 - k)] < density ? '#' : '.';
+        return x === 0 || y === 0 || x === W - 1 || y === H - 1 || this.rand() < density ? '#' : '.';
       });
-      const clear = (x, y) => { // and its mirror image, to stay symmetric
-        if (x <= 0 || y <= 0 || x >= W - 1 || y >= H - 1) return;
-        g[this.idx(x, y)] = g[N - 1 - this.idx(x, y)] = '.';
-      };
+      const clear = (x, y) => { if (x > 0 && y > 0 && x < W - 1 && y < H - 1) g[this.idx(x, y)] = '.'; };
       for (const [sx, sy] of SPAWNS) for (let d = -2; d <= 2; d++) { clear(sx + d, sy); clear(sx, sy + d); } // room to dodge the first bomb
       const open = g.filter(c => c === '.').length, seen = new Set([this.idx(...SPAWNS[0])]), queue = [...seen];
       for (let k; (k = queue.shift()) !== undefined;) for (const n of [k - 1, k + 1, k - W, k + W])

@@ -122,13 +122,12 @@ test('with no crates left, potions keep appearing on open floor, faster and fast
   expect(g.overT).toBe(0); // no clock ends the round
 });
 
-test('wall layouts vary, stay symmetric, keep spawns open and everything reachable', () => {
+test('wall layouts vary, keep spawns open and everything reachable', () => {
   const g = new Game(), layouts = new Set();
   for (let i = 0; i < 200; i++) {
     const w = g.makeWalls();
     layouts.add(w.join(''));
     for (let y = 0; y < 13; y++) for (let x = 0; x < W; x++) {
-      expect(w[y * W + x]).toBe(w[(12 - y) * W + (W - 1 - x)]); // mirrored
       if (x === 0 || y === 0 || x === W - 1 || y === 12) expect(w[y * W + x]).toBe('#'); // border intact
     }
     for (const [x, y] of [[1, 1], [2, 1], [3, 1], [1, 2], [1, 3], [13, 11], [7, 1], [1, 5]]) expect(w[y * W + x]).toBe('.');
@@ -137,6 +136,8 @@ test('wall layouts vary, stay symmetric, keep spawns open and everything reachab
     expect(seen.size).toBe(open); // no sealed-off pockets
   }
   expect(layouts.size).toBeGreaterThan(150); // actually varied
+  const mirrored = l => [...l].every((c, k, a) => c === a[a.length - 1 - k]);
+  expect([...layouts].filter(mirrored).length).toBe(0); // and not symmetric
 });
 
 test('two characters never share a tile', () => {
