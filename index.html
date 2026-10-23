@@ -163,7 +163,7 @@
     <div class="status wait" id="sumStatus"><i></i><span>Riding to the host's keep…</span></div></div>
   <form class="panel"><input id="name" placeholder="Thy name, hero" maxlength="16" required autofocus autocomplete="off"><button id="go">TO BATTLE</button></form>
   <div class="foes" id="foes"><span id="foesLabel">OPPONENTS</span><button type="button" data-n="0" hidden>0</button><button type="button" data-n="1">1</button><button type="button" data-n="2" class="on">2</button><button type="button" data-n="3">3</button></div>
-  <div class="foes" id="tourney" hidden><span>FIRST TO</span><button type="button" data-t="0" title="Endless rounds">∞</button><button type="button" data-t="1">1</button><button type="button" data-t="2">2</button><button type="button" data-t="3" class="on">3</button></div>
+  <div class="foes" id="tourney" hidden><span>FIRST TO</span><button type="button" data-t="0" title="Endless rounds">∞</button><button type="button" data-t="1">1</button><button type="button" data-t="2" class="on">2</button><button type="button" data-t="3">3</button></div>
   <div class="keys"><span><kbd>WASD</kbd><kbd>↑↓←→</kbd>move</span><span><kbd>SPACE</kbd>drop bomb</span><span><kbd>M</kbd>mute</span></div>
 </div>
 <script type="module">
@@ -1073,7 +1073,7 @@ function notice(small, big, text) {
   $('soloLink').href = location.pathname;
   $('notice').hidden = false;
 }
-let foes = 2, firstTo = 3, mode = 'solo', send, start, party, guest = false;
+let foes = 2, firstTo = 2, mode = 'solo', send, start, party, guest = false;
 if (online) $('modes').hidden = $('foes').hidden = $('invite').hidden = true;
 // Someone already hosts this room: stop the local arena and play in theirs.
 function joinRoom(room) {
