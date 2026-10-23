@@ -38,22 +38,20 @@ export class Game {
       && ![...this.players.values()].some(q => q !== self && q.alive && this.holds(q, x, y));
   }
 
-  // A fresh wall layout per round: the classic pillar grid with random gaps and extra walls,
-  // mirrored four ways so every corner spawn is equally fair. Spawns stay open and every
-  // open tile stays reachable (retried until it is).
+  // A fresh wall layout per round: walls scattered at random (20-30% of tiles), point-symmetric
+  // (rotated 180°) so opposite spawns are equally fair. Spawns stay open and every open tile
+  // stays reachable (retried until it is).
   makeWalls() {
+    const N = W * H;
     for (;;) {
-      const keep = 0.45 + this.rand() * 0.35, extra = 0.02 + this.rand() * 0.06;
-      const quad = Array.from({ length: H }, () => Array.from({ length: W }, () => this.rand()));
-      const g = [];
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-        const qx = Math.min(x, W - 1 - x), qy = Math.min(y, H - 1 - y), r = quad[qy][qx];
-        const border = qx === 0 || qy === 0, pillar = qx % 2 === 0 && qy % 2 === 0;
-        g.push(border || (pillar ? r < keep : r < extra) ? '#' : '.');
-      }
-      const clear = (x, y) => { // and its mirror images, to stay symmetric
+      const density = 0.2 + this.rand() * 0.1, r = Array.from({ length: N }, () => this.rand());
+      const g = r.map((_, k) => {
+        const x = k % W, y = (k - x) / W;
+        return x === 0 || y === 0 || x === W - 1 || y === H - 1 || r[Math.min(k, N - 1 - k)] < density ? '#' : '.';
+      });
+      const clear = (x, y) => { // and its mirror image, to stay symmetric
         if (x <= 0 || y <= 0 || x >= W - 1 || y >= H - 1) return;
-        for (const [mx, my] of [[x, y], [W - 1 - x, y], [x, H - 1 - y], [W - 1 - x, H - 1 - y]]) g[this.idx(mx, my)] = '.';
+        g[this.idx(x, y)] = g[N - 1 - this.idx(x, y)] = '.';
       };
       for (const [sx, sy] of SPAWNS) for (let d = -2; d <= 2; d++) { clear(sx + d, sy); clear(sx, sy + d); } // room to dodge the first bomb
       const open = g.filter(c => c === '.').length, seen = new Set([this.idx(...SPAWNS[0])]), queue = [...seen];
