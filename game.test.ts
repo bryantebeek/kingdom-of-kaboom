@@ -212,3 +212,76 @@ test('every player gets a different hero until they run out', () => {
   g.join('extra', 'Extra');
   expect(g.players.get('extra').look).toBeLessThan(HEROES);
 });
+
+test('war party lobby: heroes line up, pick free looks, then the host starts the tourney', () => {
+  const g = new Game();
+  g.join('h', 'Host', 'h', 3);
+  g.gather();
+  g.receive('a', { t: 'join', name: 'A', look: 3 }); // taken: gets another
+  g.receive('b', { t: 'join', name: 'B', look: 5 });
+  const [h, a, b] = g.players.values();
+  expect([h.look, b.look]).toEqual([3, 5]);
+  expect(a.look).not.toBe(3);
+  expect([h, a, b].every(p => p.alive && p.y === 6)).toBe(true); // standing in a row
+  expect(a.x - h.x).toBeCloseTo(b.x - a.x);
+  g.input('a', { t: 'look', look: 5 }); // taken
+  expect(a.look).not.toBe(5);
+  g.input('a', { t: 'look', look: 0 });
+  g.input('h', { t: 'look', look: 99 }); // nonsense keeps a valid, free look
+  expect(a.look).toBe(0);
+  expect(h.look).toBeLessThan(HEROES);
+  g.input('a', { t: 'bomb' });
+  g.input('a', { t: 'dir', d: 'right' });
+  for (let i = 0; i < 30; i++) g.tick(1 / 30);
+  expect(g.bombs).toHaveLength(0); // nothing happens until the host starts
+  expect(g.snapshot().lobby).toBe(true);
+  g.leave('a');
+  expect(b.x - h.x).toBeCloseTo(1.4); // gap closed
+
+  g.firstTo = 1;
+  h.score = 4;
+  g.begin();
+  expect([g.lobby, g.round, h.score, g.grid.includes('+')]).toEqual([false, 1, 0, true]);
+  const worn = h.look;
+  g.input('h', { t: 'look', look: (worn + 1) % HEROES });
+  expect(h.look).toBe(worn); // no costume changes mid-battle
+  b.alive = false;
+  g.tick(1 / 30); // h wins the tourney
+  expect(g.podium).toEqual(['h', 'b']);
+  for (let t = 0; t < 10.1; t += 0.1) g.tick(0.1);
+  expect([g.lobby, g.podium, h.score]).toEqual([true, null, 0]); // back to the muster
+});
+
+test('chat: clean, short, and rate limited per player', () => {
+  const g = new Game();
+  g.receive('a', { t: 'join', name: 'A' });
+  g.snapshot();
+  g.input('a', { t: 'chat', text: '  hail\u0000 <b>friends</b>\n ' + 'x'.repeat(200) });
+  g.input('a', { t: 'chat', text: 'spam' }); // too soon
+  g.input('a', { t: 'chat', text: '   ' });
+  g.input('nobody', { t: 'chat', text: 'ghost' });
+  let chat = g.snapshot().ev.filter(e => e.e === 'chat');
+  expect(chat).toHaveLength(1);
+  expect(chat[0].text.startsWith('hail <b>friends</b> xx')).toBe(true); // markup stays text: the client escapes it
+  expect(chat[0].text).toHaveLength(120);
+  expect(chat[0].n).toBe('A');
+  g.tick(0.6);
+  g.input('a', { t: 'chat', text: 'again' });
+  chat = g.snapshot().ev.filter(e => e.e === 'chat');
+  expect(chat.map(e => e.text)).toEqual(['again']);
+});
+
+test('the host can reset everyone to 0 mid-tourney, even those away', () => {
+  const g = new Game();
+  g.receive('a', { t: 'join', name: 'A', key: 'ka' });
+  g.receive('b', { t: 'join', name: 'B', key: 'kb' });
+  g.players.get('a').score = 2;
+  g.players.get('b').score = 1;
+  g.leave('b');
+  g.snapshot();
+  g.resetScores(true);
+  expect(g.players.get('a').score).toBe(0);
+  expect(g.snapshot().ev.map(e => e.e)).toContain('reset');
+  g.receive('b2', { t: 'join', name: 'B', key: 'kb' });
+  expect(g.players.get('b2').score).toBe(0);
+});

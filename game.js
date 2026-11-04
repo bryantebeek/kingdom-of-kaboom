@@ -7,6 +7,8 @@ const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' };
 const FLAME = 0.3; // seconds a blast stays deadly
 const DROP = 0.5; // chance a crate leaves a potion behind
 export const PODIUM = [[7, 6], [6, 6], [8, 6]]; // 1st, 2nd, 3rd: mid-arena, silver on the left as the camera sees it
+const LINEUP = 1.4; // tiles between heroes standing in the lobby
+const CHAT_GAP = 0.5; // seconds a player must wait between chat lines
 
 // Player: { id, name, color, x, y, alive, maxBombs, range, delay, dir, m, score }
 // x/y are floats: players glide between tile centers, `m` is the current glide direction.
@@ -21,6 +23,10 @@ export class Game {
   roundSize = 0;
   firstTo = 0; // tourney: first to this many round wins takes the podium (0 = endless rounds)
   podium = null; // ids of the top 3 while the tourney's podium is up
+  lobby = false; // war party muster: heroes line up and pick their look until the host starts
+  party = false; // a war party returns to the lobby after each tourney
+  host = null; // player id of whoever runs the game (only shown to clients)
+  now = 0; // seconds of game time, for chat rate limits
   round = 0;
   ev = []; // one-shot events for client effects, drained by snapshot()
   overT = 0;
@@ -60,11 +66,42 @@ export class Game {
     }
   }
 
+  resetScores(announce = false) { // everyone, even those away, back to 0
+    for (const p of this.players.values()) p.score = 0;
+    for (const k of this.known.keys()) this.known.set(k, 0);
+    if (announce) this.ev.push({ e: 'reset' });
+  }
+
+  // An empty arena: walls only on the border, nothing to blow up.
+  clear() {
+    this.grid = Array.from({ length: W * H }, (_, k) => (k % W === 0 || k % W === W - 1 || k < W || k >= W * (H - 1) ? '#' : '.'));
+    this.bombs = []; this.flames = []; this.items.clear();
+  }
+
+  // Back to the lobby: clear the arena and line everyone up to pick heroes until the host starts.
+  gather() {
+    this.lobby = true; this.party = true; this.podium = null; this.overT = 0; this.msg = '';
+    this.clear();
+    this.line();
+  }
+
+  line() {
+    const ps = [...this.players.values()], n = Math.min(ps.length, SPAWNS.length);
+    ps.forEach((p, i) => Object.assign(p, { alive: i < n, m: null, x: (W - 1) / 2 + (i - (n - 1) / 2) * LINEUP, y: PODIUM[0][1] }));
+  }
+
+  begin() {
+    this.lobby = false;
+    this.resetScores();
+    this.round = 0;
+    this.reset();
+  }
+
   reset() {
-    if (this.podium) { // the podium came down: a fresh tourney, everyone (even those away) back to 0
-      for (const p of this.players.values()) p.score = 0;
-      for (const k of this.known.keys()) this.known.set(k, 0);
+    if (this.podium) { // the podium came down: a fresh tourney, or back to the lobby for a war party
+      this.resetScores();
       this.podium = null;
+      if (this.party) return this.gather();
     }
     this.grid = this.makeWalls().map(c => (c === '.' && this.rand() < 0.5 ? '+' : c));
     this.bombs = []; this.flames = []; this.items.clear(); this.overT = 0; this.msg = ''; this.round++; this.spawnT = 2; this.spawns = 0;
@@ -80,22 +117,28 @@ export class Game {
     this.roundSize = [...this.players.values()].filter(p => p.alive).length;
   }
 
+  // The hero someone asked for if nobody else wears it, otherwise a random free one:
+  // nobody looks alike until all heroes are taken.
+  pickLook(want, self) {
+    const worn = new Set([...this.players.values()].filter(p => p !== self).map(p => p.look));
+    if (Number.isInteger(want) && want >= 0 && want < HEROES && !worn.has(want)) return want;
+    const looks = [...Array(HEROES).keys()].filter(i => !worn.has(i));
+    return looks[Math.floor(this.rand() * looks.length)] ?? Math.floor(this.rand() * HEROES);
+  }
+
   // `key` stays the same when a player reconnects (a new connection id doesn't make a new person).
-  join(id, name, key = id) {
-    if (!this.known.has(key)) { // a newcomer: everyone starts over on equal terms
-      for (const p of this.players.values()) p.score = 0;
-      for (const k of this.known.keys()) this.known.set(k, 0);
-    }
-    const used = new Set([...this.players.values()].map(p => p.color)), worn = new Set([...this.players.values()].map(p => p.look));
-    const looks = [...Array(HEROES).keys()].filter(i => !worn.has(i)); // nobody looks alike until all heroes are taken
+  join(id, name, key = id, look) {
+    if (!this.known.has(key)) this.resetScores(); // a newcomer: everyone starts over on equal terms
+    const used = new Set([...this.players.values()].map(p => p.color));
     this.players.set(id, {
-      id, key, name, color: COLORS.find(c => !used.has(c)) ?? '#888', look: looks[Math.floor(this.rand() * looks.length)] ?? Math.floor(this.rand() * HEROES),
-      x: 0, y: 0, alive: false,
+      id, key, name, color: COLORS.find(c => !used.has(c)) ?? '#888', look: this.pickLook(look),
+      x: 0, y: 0, alive: false, said: -Infinity,
       maxBombs: 1, range: 1, delay: 0.2, dir: null, m: null, score: this.known.get(key) ?? 0,
     });
     this.known.set(key, this.players.get(id).score);
-    // nobody to fight yet: start fresh; otherwise wait for next round
-    if ([...this.players.values()].filter(p => p.alive).length <= 1) this.reset();
+    // in the lobby: fall in line; nobody to fight yet: start fresh; otherwise wait for next round
+    if (this.lobby) this.line();
+    else if ([...this.players.values()].filter(p => p.alive).length <= 1) this.reset();
   }
 
   leave(id) {
@@ -104,12 +147,13 @@ export class Game {
     this.known.set(p.key, p.score);
     this.ev.push({ e: 'leave', n: p.name, c: p.color });
     this.players.delete(id);
+    if (this.lobby) this.line(); // close the gap
   }
 
   // One message from a remote player (Bun server or browser host): join once, then inputs.
   receive(id, m) {
     if (m?.t !== 'join' || this.players.has(id)) return m && this.input(id, m);
-    this.join(id, String(m.name || 'anon').trim().slice(0, 16) || 'anon', m.key ? String(m.key).slice(0, 64) : id);
+    this.join(id, String(m.name || 'anon').trim().slice(0, 16) || 'anon', m.key ? String(m.key).slice(0, 64) : id, m.look);
     const p = this.players.get(id);
     this.ev.push({ e: 'join', n: p.name, c: p.color });
   }
@@ -118,12 +162,21 @@ export class Game {
     const p = this.players.get(id);
     if (!p) return;
     if (m.t === 'dir') p.dir = Object.hasOwn(DIRS, m.d) ? m.d : null;
+    if (m.t === 'look' && this.lobby) p.look = this.pickLook(m.look, p);
+    if (m.t === 'chat') this.chat(p, m.text);
     const x = Math.round(p.x), y = Math.round(p.y);
-    if (m.t === 'bomb' && p.alive && !this.overT && !this.bombAt(x, y)
+    if (m.t === 'bomb' && p.alive && !this.overT && !this.lobby && !this.bombAt(x, y)
       && this.bombs.filter(b => b.owner === id).length < p.maxBombs) {
       this.bombs.push({ id: ++this.bombId, x, y, owner: id, t: 2.5, range: p.range });
       this.ev.push({ e: 'place', x, y });
     }
+  }
+
+  chat(p, raw) {
+    const text = String(raw ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, '').trim().slice(0, 120);
+    if (!text || this.now - p.said < CHAT_GAP) return;
+    p.said = this.now;
+    this.ev.push({ e: 'chat', id: p.id, n: p.name, c: p.color, text });
   }
 
   explode(b) {
@@ -173,7 +226,8 @@ export class Game {
   }
 
   tick(dt) {
-    if (!this.players.size) return;
+    this.now += dt;
+    if (!this.players.size || this.lobby) return;
     if (this.overT > 0) { if ((this.overT -= dt) <= 0) this.reset(); return; }
 
     for (const p of this.players.values()) {
@@ -224,8 +278,7 @@ export class Game {
   // Tourney over: clear the arena and stand the top 3 on the podium tiles until the next tourney.
   crown(champ) {
     const top = [...this.players.values()].sort((a, b) => b.score - a.score).slice(0, PODIUM.length);
-    this.grid = this.grid.map((_, k) => (k % W === 0 || k % W === W - 1 || k < W || k >= W * (H - 1) ? '#' : '.'));
-    this.bombs = []; this.flames = []; this.items.clear();
+    this.clear();
     for (const p of this.players.values()) Object.assign(p, { alive: false, m: null });
     top.forEach((p, i) => { [p.x, p.y] = PODIUM[i]; p.alive = true; });
     this.podium = top.map(p => p.id);
@@ -263,7 +316,7 @@ export class Game {
     const ev = this.ev;
     this.ev = [];
     return {
-      round: this.round, ev, firstTo: this.firstTo, podium: this.podium,
+      round: this.round, ev, firstTo: this.firstTo, podium: this.podium, lobby: this.lobby, host: this.host,
       grid: this.grid.join(''),
       players: [...this.players.values()].map(({ id, name, color, look, x, y, alive, score, delay, maxBombs, range, m, dir }) =>
         ({ id, name, color, look, x: +x.toFixed(3), y: +y.toFixed(3), alive, score, delay, maxBombs, range, m, d: dir })),
@@ -281,7 +334,7 @@ export class Game {
 // escape route exists. Plans from the tile center it's heading into, so turns land exactly there.
 export function botThink(game, id) {
   const p = game.players.get(id);
-  if (!p?.alive || game.overT) return;
+  if (!p?.alive || game.overT || game.lobby) return;
   const [mx, my] = p.m ? DIRS[p.m] : [0, 0];
   // Plan from where a turn would actually happen: move() snaps a turn back to the center we just
   // left while we're within 0.25 of it, otherwise it happens at the center we're heading into.
