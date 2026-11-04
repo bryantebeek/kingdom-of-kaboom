@@ -52,7 +52,7 @@
   #join { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     background: radial-gradient(ellipse at center, rgba(30, 15, 5, .1), rgba(20, 10, 4, .8)); transition: opacity .8s; }
   #join.gone { opacity: 0; pointer-events: none; }
-  .logo { text-align: center; font: 900 clamp(64px, 11vw, 160px)/.9 'Cinzel Decorative';
+  .logo { text-align: center; font: 900 clamp(56px, min(11vw, 15vh), 160px)/.9 'Cinzel Decorative';
     background: linear-gradient(180deg, #fff6d8 10%, #f3cf7a 45%, #b7792a 75%, #6e4212); -webkit-background-clip: text; background-clip: text; color: transparent;
     filter: drop-shadow(0 6px 0 #2a1406) drop-shadow(0 0 40px rgba(255, 170, 60, .5)); animation: float 4s ease-in-out infinite; }
   .logo small { display: block; font: 700 .3em 'Cinzel'; letter-spacing: .35em; margin-bottom: 6px; }
@@ -123,11 +123,78 @@
   #notice .btn { padding: 11px 22px; font-size: 16px; }
   .keys { display: flex; gap: 22px; font-size: 16px; color: #e0cda6; text-shadow: 0 1px 0 #000; }
 
+  .btn:disabled { filter: grayscale(.8) brightness(.7); cursor: not-allowed; transform: none; }
   .p { display: none !important; }
   body.pad .p { display: inline-block !important; }
   body.pad .k { display: none !important; }
   kbd.pa { min-width: 24px; padding: 1px 0; border-radius: 50%; background: #24461a; border-color: #6fbf4a; color: #dff5cf; }
 
+  /* hero picker: on the title screen, then docked at the bottom of the muster */
+  #heroes { display: flex; flex-direction: column; align-items: center; gap: 9px; margin: 0 0 16px; }
+  #heroes > small { font: 700 13px 'Cinzel'; letter-spacing: .42em; color: #e0cda6; text-shadow: 0 1px 0 #000; }
+  .cards { display: flex; gap: 6px; }
+  .hero { position: relative; width: 64px; height: 80px; padding: 0; border: 2px solid var(--gold-d); border-radius: 8px; cursor: pointer; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 28%, #5a3d22, #1e130a 78%); box-shadow: inset 0 0 0 1px rgba(255, 220, 150, .14), 0 4px 10px rgba(0, 0, 0, .5);
+    transition: transform .18s cubic-bezier(.2, 1.4, .4, 1), box-shadow .2s, border-color .2s; }
+  .hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s; }
+  .hero.ready img { opacity: 1; }
+  .hero:not(.ready)::before { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 230, 170, .14) 50%, transparent 70%) 0 0 / 200% 100%;
+    animation: shimmer 1.2s linear infinite; }
+  .hero:hover { transform: translateY(-3px); border-color: #c8973f; }
+  .hero.on { border-color: var(--gold); transform: translateY(-6px) scale(1.07); background: radial-gradient(ellipse at 50% 28%, #b07a30, #2a1a0c 78%);
+    box-shadow: 0 0 0 2px rgba(255, 230, 170, .3), 0 0 24px rgba(255, 170, 60, .6), 0 8px 16px rgba(0, 0, 0, .5); }
+  .hero.taken { cursor: not-allowed; border-color: #4a3420; transform: none; }
+  .hero.taken img { filter: grayscale(1) brightness(.4); }
+  .hero.taken::after { content: ''; position: absolute; right: 5px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px #000, 0 0 8px var(--c); }
+  .hero.no { animation: nope .32s; }
+  .pick { display: flex; align-items: center; gap: 10px; }
+  .pick b { min-width: 240px; text-align: center; font: 900 19px 'Cinzel'; letter-spacing: .14em; color: #fff0c8; text-shadow: 0 2px 0 #000, 0 0 14px rgba(255, 190, 90, .6); }
+  .pick button { padding: 0 6px; border: 0; background: none; color: var(--gold); font: 900 18px 'Cinzel'; cursor: pointer; text-shadow: 0 2px 0 #000; transition: transform .1s; }
+  .pick button:hover { transform: scale(1.25); }
+  body > #heroes { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); margin: 0; padding: 10px 14px 8px; animation: rise .45s cubic-bezier(.2, 1.4, .4, 1); }
+  body:not(.lobby) > #heroes { display: none; }
+
+  /* the muster: the war party lobby */
+  #muster { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; animation: fadein .6s; }
+  #muster small { font: 700 13px 'Cinzel'; letter-spacing: .42em; color: var(--gold); text-shadow: 0 2px 0 #000; }
+  #muster h1 { margin: 2px 0 8px; font: 900 56px/1.05 'Cinzel Decorative';
+    background: linear-gradient(180deg, #fff6d8 10%, #f3cf7a 45%, #b7792a 78%, #6e4212); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 3px 0 #2a1406) drop-shadow(0 0 24px rgba(255, 170, 60, .45)); }
+  body:not(.lobby) #muster, body.lobby #stats, body.lobby #spec { display: none !important; }
+  .cls { font: 700 13px 'Cinzel'; letter-spacing: .08em; color: #cdb68c; white-space: nowrap; }
+
+  .ctl { display: flex; flex-direction: column; gap: 9px; margin: 12px 4px 0; padding-top: 12px; border-top: 1px solid rgba(232, 193, 112, .3); }
+  .opt { display: flex; align-items: center; justify-content: space-between; font: 700 14px 'Cinzel'; letter-spacing: .2em; color: #e0cda6; text-shadow: 0 1px 0 #000; }
+  .seg { display: flex; gap: 5px; }
+  .seg button { width: 38px; height: 32px; border: 2px solid var(--gold-d); border-radius: 6px; cursor: pointer; background: rgba(40, 24, 12, .85); color: var(--ink); font: 900 15px 'Cinzel'; }
+  .seg button.on { background: linear-gradient(180deg, #ffe7a0, #d19a3a); color: #2a1406; border-color: #7a4a14; }
+  .btn.big { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 3px; padding: 12px; font-size: 18px; letter-spacing: .14em; }
+  #battleCtl { flex-direction: row; }
+  #battleCtl .btn { flex: 1; padding: 9px 4px; font-size: 13px; }
+  #battleCtl .btn.warn { background: linear-gradient(180deg, #ffb59a, #c4502a); color: #2a0e06; border-color: #6a2210; }
+  body.lobby #battleCtl, body:not(.lobby) #lobbyCtl { display: none; }
+  body.lobby #partyX { visibility: hidden; }
+
+  /* chat */
+  #chat { position: fixed; left: 20px; bottom: 78px; width: 380px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+  #log { display: flex; flex-direction: column; justify-content: flex-end; gap: 3px; max-height: 236px; overflow: hidden; }
+  .line { align-self: flex-start; max-width: 100%; padding: 4px 10px; border-radius: 6px; background: rgba(20, 12, 6, .66); font-size: 16px; font-weight: 700; color: #f1e2c2;
+    text-shadow: 0 1px 0 #000; overflow-wrap: anywhere; animation: slide .3s cubic-bezier(.2, 1.4, .4, 1), fade .8s 12s forwards; }
+  .line b { margin-right: 7px; }
+  #chatIn { display: none; width: 100%; padding: 9px 12px; border-radius: 6px; border: 2px solid var(--gold-d); outline: none; pointer-events: auto;
+    background: rgba(20, 12, 6, .88); color: var(--ink); font: 700 16px 'Alegreya Sans'; box-shadow: inset 0 2px 6px rgba(0, 0, 0, .5); }
+  #chatIn::placeholder { color: #8a7458; }
+  #chatIn:focus { border-color: var(--gold); box-shadow: inset 0 2px 6px rgba(0, 0, 0, .5), 0 0 0 3px rgba(232, 193, 112, .25); }
+  #chat.open #chatIn, body.lobby #chatIn { display: block; }
+  #chat.open .line, body.lobby .line { animation: none; }
+
+  body.lobby #help { display: none; }
+  body.lobby #chat { bottom: 22px; }
+  @media (max-width: 1500px) { .hero { width: 54px; height: 68px; } #chat { width: 300px; } .pick b { min-width: 200px; } }
+  @media (max-width: 1400px) { body > #heroes .hero { width: 50px; height: 62px; } }
+
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  @keyframes nope { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
   @keyframes pop { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } }
   @keyframes slide { from { transform: translateX(-40px); opacity: 0; } }
   @keyframes fade { to { transform: translateX(-20px); opacity: 0; } }
@@ -147,13 +214,21 @@
 <div id="stats" class="panel" hidden></div>
 <div id="spec" hidden>FALLEN — AWAITING NEXT ROUND</div>
 <div id="banner"></div>
-<div id="help" class="panel" hidden><span><kbd class="k">WASD</kbd><kbd class="p">✣</kbd>move</span><span><kbd class="k">SPACE</kbd><kbd class="p pa">A</kbd>bomb</span><span><kbd>M</kbd>mute</span><span><kbd>N</kbd>music</span><span id="invite" style="cursor:pointer"><kbd class="k">I</kbd><kbd class="p">⧉</kbd>war party</span></div>
+<div id="muster"><small id="musterRoom">⚑ WAR PARTY ⚑</small><h1>The Muster</h1><div class="status" id="musterStatus"><i></i><span></span></div></div>
+<div id="chat"><div id="log"></div><input id="chatIn" maxlength="120" placeholder="Speak, champion…  (Enter to send)" autocomplete="off" spellcheck="false"></div>
+<div id="help" class="panel" hidden><span><kbd class="k">WASD</kbd><kbd class="p">✣</kbd>move</span><span><kbd class="k">SPACE</kbd><kbd class="p pa">A</kbd>bomb</span><span><kbd>ENTER</kbd>chat</span><span><kbd>M</kbd>mute</span><span><kbd>N</kbd>music</span><span id="invite" style="cursor:pointer"><kbd class="k">I</kbd><kbd class="p">⧉</kbd>war party</span></div>
 <div id="party" class="panel" hidden>
   <h3><span>⚑ WAR PARTY</span><button class="x" id="partyX" title="Close (I)">×</button></h3>
-  <p>Send this link to thine allies. They join next round.</p>
+  <p>Send this link to thine allies.</p>
   <div class="link"><input id="partyLink" readonly placeholder="Raising the banner…"><button class="btn" id="copy">COPY</button></div>
   <div class="status wait" id="partyStatus"><i></i><span>Raising the banner…</span></div>
   <div class="hint">Keep this tab open: thy browser is the arena.</div>
+  <div class="ctl" id="lobbyCtl">
+    <div class="opt"><span>BOTS</span><div class="seg" id="bots"><button data-n="0" class="on">0</button><button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button></div></div>
+    <div class="opt"><span>FIRST TO</span><div class="seg" id="firstTo"><button data-t="0" title="Endless rounds">∞</button><button data-t="1">1</button><button data-t="2" class="on">2</button><button data-t="3">3</button></div></div>
+    <button class="btn big" id="begin">⚔ START BATTLE <kbd class="p">☰</kbd></button>
+  </div>
+  <div class="ctl" id="battleCtl"><button class="btn ghost" id="resetScores">⟲ RESET SCORES</button><button class="btn ghost" id="toLobby">⚑ TO THE MUSTER</button></div>
 </div>
 <div id="notice" hidden><div class="panel"><small id="noticeSmall"></small><h2 id="noticeBig"></h2><p id="noticeText"></p>
   <div class="btns"><a class="btn" id="soloLink">PLAY VS BOTS</a><button class="btn ghost" onclick="location.reload()">TRY AGAIN</button></div></div></div>
@@ -167,10 +242,11 @@
   <div class="summons panel" id="summons" hidden><small>⚔ THOU ART SUMMONED ⚔</small>
     <div class="status wait" id="sumStatus"><i></i><span>Riding to the host's keep…</span></div></div>
   <form class="panel"><input id="name" placeholder="Thy name, hero" maxlength="16" required autofocus autocomplete="off"><button id="go">TO BATTLE</button></form>
-  <div class="foes" id="foes"><span id="foesLabel">OPPONENTS</span><button type="button" data-n="0" hidden>0</button><button type="button" data-n="1">1</button><button type="button" data-n="2" class="on">2</button><button type="button" data-n="3">3</button></div>
-  <div class="foes" id="tourney" hidden><span>FIRST TO</span><button type="button" data-t="0" title="Endless rounds">∞</button><button type="button" data-t="1">1</button><button type="button" data-t="2" class="on">2</button><button type="button" data-t="3">3</button></div>
+  <div id="heroes"><small>CHOOSE THY CHAMPION</small><div class="cards" id="cards"></div>
+    <div class="pick"><button type="button" id="heroPrev" title="Previous hero">◀</button><b id="heroName"></b><button type="button" id="heroNext" title="Next hero">▶</button></div></div>
+  <div class="foes" id="foes"><span>OPPONENTS</span><button type="button" data-n="1">1</button><button type="button" data-n="2" class="on">2</button><button type="button" data-n="3">3</button></div>
   <div class="keys"><span class="k"><kbd>WASD</kbd><kbd>↑↓←→</kbd>move</span><span class="k"><kbd>SPACE</kbd>drop bomb</span><span class="k"><kbd>M</kbd>mute</span>
-    <span class="p">🎮 Controller ready: <kbd class="pa">A</kbd>to battle</span></div>
+    <span class="p">🎮 Controller ready: <kbd>✣</kbd>pick hero <kbd class="pa">A</kbd>to battle</span></div>
 </div>
 <script type="module">
 import * as THREE from 'three';
@@ -679,6 +755,98 @@ const loadClass = name => (models[name] ??= loader.loadAsync(`assets/${name}.glb
 const borrowClips = (model, clips) => clips.map(c => new THREE.AnimationClip(c.name, c.duration,
   c.tracks.filter(t => model.getObjectByName(t.name.slice(0, t.name.lastIndexOf('.'))))));
 
+// One hero model, dressed for battle: weapons in hand, cape in the player's color, ready to animate.
+function dress(cls, color) {
+  const kit = bare(cls) ? [loadClass('Knight'), ...CLASSES[cls].map(loadClass)] : [];
+  return Promise.all([loadClass(cls), ...kit]).then(([{ gltf, scale }, hero, ...weapons]) => {
+    const model = cloneSkinned(gltf.scene), cape = new THREE.MeshStandardMaterial({ color, roughness: .85 });
+    model.scale.setScalar(scale);
+    weapons.forEach((w, i) => {
+      const g = w.gltf.scene.clone();
+      if (!i) g.rotation[CLASSES[cls][0] === 'Skeleton_Staff' ? 'x' : 'y'] = Math.PI; // gripped like the heroes' sword; the staff flips so its skull points up
+      model.getObjectByName(['handslotr', 'handslotl'][i]).add(g);
+    });
+    model.traverse(o => {
+      if (!o.isMesh) return;
+      o.visible = bare(cls) || CLASSES[cls].includes(o.name) || BODY.test(o.name) || BODY.test(o.parent?.name ?? '');
+      o.castShadow = true;
+      o.frustumCulled = false; // skinned bounds are stale once animated
+      if (/_(Cape|Cloak)$/.test(o.name) || /_(Cape|Cloak)$/.test(o.parent?.name ?? '')) o.material = cape;
+    });
+    return { model, clips: hero ? borrowClips(model, hero.gltf.animations) : gltf.animations };
+  });
+}
+
+// ---------- hero picker: every hero posed mid-idle and rendered once into a portrait ----------
+const HEROES = Object.keys(CLASSES).map(c => (c === 'Rogue_Hooded' ? 'Hooded Rogue' : c.replace('_', ' ')));
+$('cards').innerHTML = HEROES.map((n, i) => `<button type="button" class="hero" data-i="${i}" title="${n}"><img alt="${n}"></button>`).join('');
+const cards = [...$('cards').children];
+{
+  const r = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+  r.setPixelRatio(1);
+  r.setSize(128, 160);
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  const stage = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 128 / 160, .1, 20);
+  cam.position.set(.32, .9, 1.75);
+  cam.lookAt(0, .6, 0);
+  const keyL = new THREE.DirectionalLight('#ffd9a0', 3.2), rimL = new THREE.DirectionalLight('#8fb0ff', 4);
+  keyL.position.set(1.4, 2, 2.4);
+  rimL.position.set(-1.8, 1.4, -2);
+  stage.add(new THREE.HemisphereLight('#ffe8c8', '#3a2418', 1.6), keyL, rimL);
+  Promise.all(Object.keys(CLASSES).map((cls, i) => dress(cls, '#8a5a2a').then(({ model, clips }) => {
+    const mixer = new THREE.AnimationMixer(model);
+    mixer.clipAction(THREE.AnimationClip.findByName(clips, 'Idle')).play();
+    mixer.update(.6);
+    model.rotation.y = .32;
+    stage.add(model);
+    r.render(stage, cam);
+    stage.remove(model);
+    cards[i].firstChild.src = r.domElement.toDataURL();
+    cards[i].classList.add('ready');
+  }))).finally(() => { r.dispose(); r.forceContextLoss(); });
+}
+let myLook = Number(localStorage.kokLook), lastSnap;
+if (!(myLook >= 0 && myLook < HEROES.length)) myLook = Math.floor(Math.random() * 5); // first visit: one of the adventurers
+const worn = () => new Map((lastSnap?.players ?? []).filter(p => p.id !== myId).map(p => [p.look, p]));
+const myHero = () => (joined ? lastSnap?.players.find(p => p.id === myId)?.look : undefined) ?? myLook;
+function heroUI() {
+  const taken = worn();
+  const free = cards.findIndex((_, i) => !taken.has(i));
+  if (!joined && taken.has(myLook) && free >= 0) myLook = free; // someone took ours while we picked a name
+  const mine = myHero(), key = JSON.stringify([mine, [...taken].map(([i, p]) => [i, p.name, p.color])]);
+  if (key === heroUI.key) return;
+  heroUI.key = key;
+  cards.forEach((c, i) => {
+    c.classList.toggle('on', i === mine);
+    c.classList.toggle('taken', taken.has(i));
+    c.style.setProperty('--c', taken.get(i)?.color ?? '');
+    c.title = taken.has(i) ? `${HEROES[i]}: worn by ${taken.get(i).name}` : HEROES[i];
+  });
+  $('heroName').textContent = HEROES[mine];
+}
+function pickHero(i) {
+  if (worn().has(i)) {
+    cards[i].classList.remove('no');
+    void cards[i].offsetWidth; // restart the shake
+    return cards[i].classList.add('no');
+  }
+  myLook = i;
+  localStorage.kokLook = i;
+  if (joined) send({ t: 'look', look: i });
+  sfx.tick(i);
+  heroUI();
+}
+function cycleHero(d) {
+  const taken = worn();
+  for (let k = 1; k < HEROES.length; k++) {
+    const i = (myHero() + d * k + HEROES.length * k) % HEROES.length;
+    if (!taken.has(i)) return pickHero(i);
+  }
+}
+cards.forEach((c, i) => { c.onclick = () => { c.blur(); pickHero(i); }; });
+$('heroPrev').onclick = () => cycleHero(-1);
+$('heroNext').onclick = () => cycleHero(1);
+
 function label(name, color) {
   const tex = canvasTex(512, 128, g => {
     g.font = '700 50px Cinzel';
@@ -694,6 +862,25 @@ function label(name, color) {
   s.renderOrder = 10;
   return s;
 }
+// Chat lines float over the speaker's head for a few seconds.
+function say(g, text) {
+  const u = g.userData, t = text.length > 44 ? `${text.slice(0, 42)}…` : text;
+  const tex = canvasTex(512, 144, c => {
+    c.font = '800 34px "Alegreya Sans"';
+    const w = Math.min(500, c.measureText(t).width + 44), x0 = 256 - w / 2;
+    c.fillStyle = '#f6e7c8'; c.strokeStyle = '#9a6a2a'; c.lineWidth = 5;
+    c.beginPath(); c.moveTo(240, 96); c.lineTo(256, 126); c.lineTo(272, 96); c.fill(); c.stroke(); // tail
+    c.beginPath(); c.roundRect(x0, 18, w, 80, 18); c.fill(); c.stroke();
+    c.fillRect(243, 90, 26, 10); // hide the seam where tail meets bubble
+    c.fillStyle = '#3a2410'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(t, 256, 60, 470);
+  });
+  if (u.bubble) { g.remove(u.bubble); u.bubble.material.map.dispose(); u.bubble.material.dispose(); }
+  u.bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  u.bubble.scale.set(2.2, .62, 1);
+  u.bubble.renderOrder = 11;
+  u.bubble.userData.t = 5;
+  g.add(u.bubble);
+}
 const circleGeo = new THREE.PlaneGeometry(1.1, 1.1).rotateX(-Math.PI / 2);
 function makeBomber(p) {
   const root = new THREE.Group(), rig = new THREE.Group(), tag = label(p.name, p.color);
@@ -704,28 +891,11 @@ function makeBomber(p) {
     ring.position.y = .02;
     root.add(ring);
   }
-  const u = root.userData = { rig, tag, ring, yaw: 0, yawT: 0, alive: p.alive, drop: p.alive ? 1 : 0, die: -1, color: p.color, state: '', cheer: false };
-  const cls = Object.keys(CLASSES)[p.look];
-  const kit = bare(cls) ? [loadClass('Knight'), ...CLASSES[cls].map(loadClass)] : [];
-  Promise.all([loadClass(cls), ...kit]).then(([{ gltf, scale }, hero, ...weapons]) => {
-    const model = cloneSkinned(gltf.scene), cape = new THREE.MeshStandardMaterial({ color: p.color, roughness: .85 });
-    model.scale.setScalar(scale);
-    weapons.forEach((w, i) => {
-      const g = w.gltf.scene.clone();
-      if (!i) g.rotation[CLASSES[cls][0] === 'Skeleton_Staff' ? 'x' : 'y'] = Math.PI; // gripped like the heroes' sword; the staff flips so its skull points up
-      model.getObjectByName(['handslotr', 'handslotl'][i]).add(g);
-    });
-    model.traverse(o => {
-      if (!o.isMesh) return;
-      o.visible = bare(cls) || CLASSES[cls].includes(o.name) || BODY.test(o.name) || BODY.test(o.parent?.name ?? '');
-      o.castShadow = true;
-      o.frustumCulled = false; // skinned bounds are stale once animated
-      if (/_(Cape|Cloak)$/.test(o.name) || /_(Cape|Cloak)$/.test(o.parent?.name ?? '')) o.material = cape;
-    });
+  const u = root.userData = { id: p.id, rig, tag, ring, yaw: 0, yawT: 0, alive: p.alive, drop: p.alive ? 1 : 0, die: -1, color: p.color, state: '', cheer: false };
+  dress(Object.keys(CLASSES)[p.look], p.color).then(({ model, clips }) => {
     rig.add(model);
     u.bones = ['hips', 'spine', 'chest', 'head'].map(n => model.getObjectByName(n)).filter(Boolean); // death motes rise from the body
     u.mixer = new THREE.AnimationMixer(model);
-    const clips = hero ? borrowClips(model, hero.gltf.animations) : gltf.animations;
     u.actions = Object.fromEntries(['Idle', 'Running_A', 'Death_A', 'Cheer', 'Jump_Land'].map(n => [n, u.mixer.clipAction(THREE.AnimationClip.findByName(clips, n))]));
     for (const n of ['Death_A', 'Jump_Land']) { u.actions[n].setLoop(THREE.LoopOnce); u.actions[n].clampWhenFinished = true; }
   });
@@ -901,6 +1071,9 @@ const sfx = {
   join: () => arp(523, [0, 7, 12], .18, 'triangle', .12, .07),
   win: () => arp(392, [0, 4, 7, 12], .5, 'triangle', .18, .12),
   fight: () => { tone(196, .7, 'sawtooth', .1); tone(294, .9, 'sawtooth', .1, 294, .18); noise(.3, .15, 3000, 400); }, // war horn
+  tick: i => tone(587 * 2 ** ([0, 2, 3, 5, 7, 9, 10, 12, 14][i % 9] / 12), .25, 'triangle', .12), // each hero rings its own note
+  chat: () => { tone(880, .08, 'sine', .07); tone(1320, .12, 'sine', .05, 1320, .05); },
+  nope: () => tone(140, .15, 'square', .06, 100),
 };
 
 // ---------- music: a little band of oscillators. Harp and drone in the menus, drums and flute in battle ----------
@@ -1037,23 +1210,39 @@ function fallFacing(x, y, yaw) {
   const keep = opts.find(o => o.free && Math.abs(Math.atan2(Math.sin(o.yaw - yaw), Math.cos(o.yaw - yaw))) < .1);
   return (keep ?? opts.find(o => o.free))?.yaw ?? yaw;
 }
-const near = (x, z) => { const g = players.get(myId); return g?.visible ? Math.max(0, 1 - Math.hypot(g.position.x - x, g.position.z - z) / 6) : 0; };
 const walkable = (x, y) => grid[y * W + x] === '.' && !bombTiles.has(y * W + x) && !bodies.has(y * W + x);
 let gen = 0, myId, joined = false, round, lastMsg = '', shake = 0, time = 0, hudHtml = '';
+let wasLobby = false, stage = null, stageN = 0, hostCtl = null; // hostCtl: what the host's buttons do, when this tab runs the game
+const bomber = id => [...players.values()].find(g => g.userData.id === id);
+const col = c => (/^#[0-9a-f]{3,8}$/i.test(c) ? c : '#888'); // colors come from the host: never let one break out of a style
+const near = (x, z) => { const g = bomber(myId); return g?.visible ? Math.max(0, 1 - Math.hypot(g.position.x - x, g.position.z - z) / 6) : 0; };
+const mark = (sel, key, v) => document.querySelectorAll(`${sel} button`).forEach(b => b.classList.toggle('on', +b.dataset[key] === v));
 
 function apply(s) {
+  lastSnap = s;
   grid = s.grid;
   bombTiles = new Set(s.bombs.map(b => b.y * W + b.x));
   bodies = new Set(s.players.filter(p => p.alive).map(p => Math.round(p.y) * W + Math.round(p.x))); // characters block each other too
-  if (s.round !== round) {
-    if (round !== undefined) {
+  if (s.round !== round || (wasLobby && !s.lobby)) { // a new round, or the host sounded the horn
+    if (round !== undefined && !s.lobby) {
       banner(`Round ${s.round}`, 'PREPARE FOR BATTLE');
       setTimeout(() => { banner('Fight!'); sfx.fight(); }, 1100);
     }
     round = s.round;
     gen++; // fresh meshes (and pop-in) for the new layout
   }
-  music.set(joined && !s.podium ? 'battle' : 'calm');
+  wasLobby = !!s.lobby;
+  const muster = joined && wasLobby;
+  document.body.classList.toggle('lobby', muster);
+  stage = muster ? 'lobby' : s.podium ? 'podium' : null;
+  stageN = s.players.filter(p => p.alive).length;
+  music.set(joined && !s.lobby && !s.podium ? 'battle' : 'calm');
+  if (muster && s.host === myId) {
+    $('party').hidden = false; // the host's controls live there
+    mark('#bots', 'n', hostCtl?.bots());
+    mark('#firstTo', 't', s.firstTo);
+  }
+  heroUI();
   sync(walls, [...s.grid].flatMap((c, i) => {
     const x = i % W, y = Math.floor(i / W);
     return c === '#' && x > 0 && y > 0 && x < W - 1 && y < H - 1 ? [i] : [];
@@ -1069,7 +1258,8 @@ function apply(s) {
     m.userData.born = time + Math.hypot(x - CX, z - CZ) * .04;
     return m;
   });
-  sync(players, s.players, p => p.id, makeBomber, (g, p) => {
+  const slot = new Map(s.players.map((p, i) => [p.id, i]));
+  sync(players, s.players, p => `${p.id}:${p.look}`, makeBomber, (g, p) => { // a new hero is a new model
     const u = g.userData;
     Object.assign(u, { tx: p.x, ty: p.y, delay: p.delay, m: p.m, d: p.d, recv: time });
     if (u.alive && !p.alive) {
@@ -1084,11 +1274,13 @@ function apply(s) {
     }
     if (!p.alive && u.die < 0) g.visible = false;
     u.alive = p.alive;
+    if (s.lobby) Object.assign(u, { yawT: 0, d: null, cheer: false }); // face the camera in the line-up
+    u.tag.position.y = s.lobby && slot.get(p.id) % 2 ? 1.92 : 1.6; // stagger name tags so neighbours don't overlap
   });
   if (s.podium && !podium.visible) PODIUM.forEach(([x, z], i) => sparks(x, PODIUM_H[i] + .3, z, 40, hdr(PODIUM_C[i], 4).toArray(), 5));
   podium.visible = !!s.podium;
-  for (const [id, g] of players) { // the top 3 drop onto their steps, face the camera and cheer
-    const u = g.userData, i = s.podium?.indexOf(id) ?? -1;
+  for (const g of players.values()) { // the top 3 drop onto their steps, face the camera and cheer
+    const u = g.userData, i = s.podium?.indexOf(u.id) ?? -1;
     if (i < 0) { u.lift = 0; continue; }
     if (!u.lift) { g.position.set(PODIUM[i][0], 0, PODIUM[i][1]); u.drop = 1; }
     Object.assign(u, { lift: PODIUM_H[i], yawT: 0, d: null, cheer: true });
@@ -1111,10 +1303,14 @@ function apply(s) {
       if (near(e.x, e.y) > .9) rumble(0, .35, 70);
       sparks(e.x, .5, e.y, 25, hdr(ITEMS[e.k].color, 4).toArray(), 3);
     } else if (e.e === 'kill') killFeed(e);
-    else if (e.e === 'join' || e.e === 'leave') { toast(`<span style="color:var(--gold)">⚑</span> <b style="color:${e.c}">${esc(e.n)}</b><em>${e.e === 'join' ? 'joined the battle' : 'left the battle'}</em>`); sfx.join(); }
+    else if (e.e === 'join' || e.e === 'leave') {
+      toast(`<span style="color:var(--gold)">⚑</span> <b style="color:${col(e.c)}">${esc(e.n)}</b><em>${e.e === 'join' ? (s.lobby ? 'joined the muster' : 'joined the battle') : 'left the battle'}</em>`);
+      sfx.join();
+    } else if (e.e === 'chat') chatLine(e);
+    else if (e.e === 'reset') { toast('<span style="color:var(--gold)">⟲</span><em>The host reset the scores</em>'); sfx.join(); }
   }
 
-  if (s.msg && s.msg !== lastMsg) for (const p of s.players) if (p.alive && players.get(p.id)) players.get(p.id).userData.cheer = true;
+  if (s.msg && s.msg !== lastMsg) for (const p of s.players) if (p.alive && bomber(p.id)) bomber(p.id).userData.cheer = true;
   if (s.msg && s.msg !== lastMsg) {
     if (s.podium) banner(s.players.find(p => p.id === s.podium[0])?.name ?? '', 'CHAMPION OF THE TOURNEY');
     else banner(s.msg.replace(/!$/, ''), s.msg.includes('wins') ? 'VICTORY' : 'ROUND OVER');
@@ -1138,26 +1334,48 @@ function toast(html) {
   setTimeout(() => d.remove(), 5000);
 }
 function killFeed(e) {
-  const n = (name, c) => `<b style="color:${c}">${esc(name)}</b>`;
+  const n = (name, c) => `<b style="color:${col(c)}">${esc(name)}</b>`;
   toast(e.self ? `${n(e.v, e.vc)}<em>was hoist by their own petard</em>` : `${n(e.k, e.kc)}<em>💥</em>${n(e.v, e.vc)}`);
 }
+function chatLine(e) {
+  const d = document.createElement('div');
+  d.className = 'line';
+  d.innerHTML = `<b style="color:${col(e.c)}">${esc(String(e.n))}</b>${esc(String(e.text))}`;
+  $('log').append(d);
+  while ($('log').childElementCount > 30) $('log').firstElementChild.remove();
+  sfx.chat();
+  const g = bomber(e.id);
+  if (g?.visible) say(g, String(e.text));
+}
 function hud(s) {
-  const head = `ROUND ${s.round}`, title = s.firstTo ? `FIRST TO ${s.firstTo}` : 'CHAMPIONS';
+  const fighters = s.players.filter(p => p.alive).length;
+  const head = s.lobby ? `${fighters} / 8` : `ROUND ${s.round}`, title = s.lobby ? 'THE MUSTER' : s.firstTo ? `FIRST TO ${s.firstTo}` : 'CHAMPIONS';
   if ($('roundNo').textContent !== head) $('roundNo').textContent = head;
   if ($('boardTitle').textContent !== title) $('boardTitle').textContent = title;
   const me = s.players.find(p => p.id === myId);
-  const html = [...s.players].sort((a, b) => b.score - a.score).map(p =>
-    `<div class="row${p.id === myId ? ' me' : ''}${p.alive ? '' : ' dead'}"><span class="chip" style="color:${p.color}"></span><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span></div>`,
-  ).join('');
-  const key = html + JSON.stringify(me && [me.maxBombs, me.range, me.delay, me.alive, s.round]);
+  const row = (p, right) => `<div class="row${p.id === myId ? ' me' : ''}${p.alive ? '' : ' dead'}"><span class="chip" style="color:${col(p.color)}"></span><span class="n">${esc(p.name)}</span>${right}</div>`;
+  const html = s.lobby
+    ? s.players.map(p => row(p, `<span class="cls">${p.id === s.host ? '⚑ ' : ''}${HEROES[p.look] ?? ''}</span>`)).join('')
+    : [...s.players].sort((a, b) => b.score - a.score).map(p => row(p, `<span class="s">${p.score}</span>`)).join('');
+  const host = s.players.find(p => p.id === s.host);
+  const key = html + JSON.stringify([me && [me.maxBombs, me.range, me.delay, me.alive], s.round, s.lobby, s.firstTo, host?.name, joined]);
   if (key === hudHtml) return;
   hudHtml = key;
   $('rows').innerHTML = html || '<div class="row">Waiting for players…</div>';
+  if (s.lobby) {
+    const room = new URLSearchParams(location.search).get('room');
+    $('musterRoom').textContent = `⚑ WAR PARTY${room ? ` · ${room.toUpperCase()}` : ''} ⚑`;
+    const rules = s.firstTo ? `first to ${s.firstTo}` : 'endless rounds';
+    if (s.host === myId) status('musterStatus', 'ok', `Thou art the host · ${rules}. Start when thine allies are ready.`);
+    else status('musterStatus', 'wait', `Awaiting <b style="color:${col(host?.color)}">${esc(host?.name ?? 'the host')}</b>'s war horn · ${rules}`);
+    $('begin').disabled = fighters < 2;
+    $('begin').firstChild.textContent = fighters < 2 ? '⚔ AWAITING FOES ' : '⚔ START BATTLE ';
+  }
   if (!me) return;
   $('stats').innerHTML = [[ITEMS.b, me.maxBombs], [ITEMS.r, me.range], [ITEMS.s, Math.round((0.2 - me.delay) / 0.025) + 1]]
     .map(([it, v]) => `<div class="stat"><img src="${it.url}">${v}</div>`).join('');
   if (me.alive) hud.aliveIn = s.round;
-  $('spec').hidden = me.alive || !!s.podium;
+  $('spec').hidden = me.alive || !!s.podium || !!s.lobby;
   $('spec').textContent = hud.aliveIn === s.round ? 'FALLEN — AWAITING NEXT ROUND' : 'SPECTATING — THOU JOINEST NEXT ROUND';
 }
 
@@ -1189,7 +1407,7 @@ if (online) $('modes').hidden = $('foes').hidden = $('invite').hidden = true;
 // Someone already hosts this room: stop the local arena and play in theirs.
 function joinRoom(room) {
   guest = true;
-  party = null;
+  party = hostCtl = null;
   $('foes').hidden = $('invite').hidden = true;
   $('go').textContent = 'JOIN BATTLE';
   status('sumStatus', 'wait', "Riding to the host's keep…");
@@ -1209,7 +1427,7 @@ function joinRoom(room) {
       conn.on('open', () => { $('go').disabled = false; });
       conn.on('data', s => {
         heard = performance.now();
-        if (!joined) status('sumStatus', 'ok', `${plural(s.players.length, 'champion awaits', 'champions await')} thee`);
+        if (!joined) status('sumStatus', 'ok', s.lobby ? `${plural(s.players.length, 'champion musters', 'champions muster')}: the battle awaits thee` : `${plural(s.players.length, 'champion battles', 'champions battle')} within: thou joinest next round`);
         apply(s);
       });
       conn.on('close', () => fail('The host closed their game.'));
@@ -1224,7 +1442,7 @@ function joinRoom(room) {
     peer.on('error', e => fail(e.type === 'peer-unavailable' ? 'The host just left.' : "Couldn't reach the host."));
   }, () => fail("Couldn't load the multiplayer module."));
   send = m => conn?.open && conn.send(m);
-  start = name => send({ t: 'join', name, key });
+  start = (name, look) => send({ t: 'join', name, key, look });
 }
 if (online) {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
@@ -1236,7 +1454,7 @@ if (online) {
     else apply(m);
   };
   ws.onclose = () => { ws.onmessage = null; notice('CONNECTION LOST', 'Disconnected', 'The server stopped answering.'); };
-  start = name => ready.then(() => send({ t: 'join', name, key }));
+  start = (name, look) => ready.then(() => send({ t: 'join', name, key, look }));
 } else {
   const game = new Game(), bots = [], guests = new Set();
   game.reset(); // an arena to look at behind the title screen
@@ -1260,6 +1478,7 @@ if (online) {
   // Open the war party panel; the first time, also claim the room.
   party = () => {
     $('party').hidden = false;
+    game.host = myId;
     host().then(url => { $('partyLink').value = url; allies(); }, () => {
       link = null; room = linkRoom; // a made-up name that clashed gets a fresh one on retry
       status('partyStatus', 'err', "Couldn't raise the banner. Press <kbd>I</kbd> twice to retry.");
@@ -1276,15 +1495,36 @@ if (online) {
       status('sumStatus', 'ok', `Room <b>${linkRoom}</b> stands empty: thou art its host`);
     }, e => e.type === 'unavailable-id' ? joinRoom(linkRoom) : status('sumStatus', 'err', `Couldn't reach the room. ${retry}`));
   }
-  start = name => {
+  // Bots in the muster come and go like players do, so everyone sees them arrive.
+  const setBots = n => {
+    while (bots.length > n) game.leave(bots.pop());
+    while (bots.length < n) { const id = `bot${bots.length}`; game.receive(id, { t: 'join', name: BOTS[bots.length] }); bots.push(id); }
+  };
+  hostCtl = {
+    bots: () => bots.length,
+    setBots: n => game.lobby && setBots(n),
+    firstTo: n => { game.firstTo = n; },
+    begin: () => {
+      if (!game.lobby || [...game.players.values()].filter(p => p.alive).length < 2) return;
+      game.begin();
+      $('party').hidden = true; // clear the view for battle; I brings it back
+    },
+    reset: () => game.resetScores(true),
+    muster: () => game.gather(),
+  };
+  start = (name, look) => {
     myId = 'me';
-    game.join(myId, name.trim().slice(0, 16) || 'Hero');
+    game.join(myId, name.trim().slice(0, 16) || 'Hero', myId, look);
+    if (mode === 'host') { // war parties gather in the muster first; the host starts the battle
+      game.firstTo = firstTo;
+      game.gather();
+      return party();
+    }
     BOTS.slice(0, foes).forEach((b, i) => { game.join(`bot${i}`, b); bots.push(`bot${i}`); });
-    game.firstTo = mode === 'host' ? firstTo : 0; // tourneys are for war parties
+    game.firstTo = 0; // tourneys are for war parties
     game.round = 0;
     game.reset();
     round = 0; // so the client announces round 1
-    if (mode === 'host') party();
   };
   setInterval(() => {
     if (guest) return; // playing in someone else's room
@@ -1300,24 +1540,32 @@ const pickFoes = n => {
   document.querySelectorAll('#foes button').forEach(o => o.classList.toggle('on', +o.dataset.n === n));
 };
 document.querySelectorAll('#foes button').forEach(b => { b.onclick = () => pickFoes(+b.dataset.n); });
-document.querySelectorAll('#tourney button').forEach(b => {
-  b.onclick = () => {
-    firstTo = +b.dataset.t;
-    document.querySelectorAll('#tourney button').forEach(o => o.classList.toggle('on', o === b));
-  };
-});
 document.querySelectorAll('#modes button').forEach(b => {
   b.onclick = () => {
     mode = b.dataset.mode;
     document.querySelectorAll('#modes button').forEach(o => o.classList.toggle('on', o === b));
     const host = mode === 'host';
-    $('foesLabel').textContent = host ? 'BOTS' : 'OPPONENTS';
-    $('foes').querySelector('[data-n="0"]').hidden = $('tourney').hidden = !host;
+    $('foes').hidden = host; // a war party picks its bots in the muster
     $('go').textContent = host ? 'HOST BATTLE' : 'TO BATTLE';
-    pickFoes(host ? 0 : 2);
     $('name').focus();
   };
 });
+// The host's war party panel: bots and rules in the muster, score reset and recall during battle.
+document.querySelectorAll('#bots button').forEach(b => { b.onclick = () => hostCtl?.setBots(+b.dataset.n); });
+document.querySelectorAll('#firstTo button').forEach(b => { b.onclick = () => { firstTo = +b.dataset.t; hostCtl?.firstTo(firstTo); }; });
+$('begin').onclick = () => hostCtl?.begin();
+$('toLobby').onclick = () => hostCtl?.muster();
+$('resetScores').onclick = () => { // twice to be sure: there's no undo
+  const b = $('resetScores'), idle = () => { b.classList.remove('warn'); b.textContent = '⟲ RESET SCORES'; };
+  clearTimeout(b.t);
+  if (b.classList.contains('warn')) { idle(); return hostCtl?.reset(); }
+  b.classList.add('warn');
+  b.textContent = '⟲ SURE? CLICK AGAIN';
+  b.t = setTimeout(idle, 2500);
+};
+$('party').addEventListener('click', e => e.target.closest('button')?.blur()); // keep Space for bombs
+const inMuster = () => document.body.classList.contains('lobby');
+const toggleParty = () => { if (party && !inMuster()) $('party').hidden ? party() : ($('party').hidden = true); };
 $('partyX').onclick = () => { $('party').hidden = true; };
 $('invite').onclick = () => party?.();
 $('copy').onclick = () => {
@@ -1333,31 +1581,57 @@ $('copy').onclick = () => {
   navigator.clipboard.writeText(url).then(() => copied(true), () => { $('partyLink').select(); copied(false); });
 };
 
+$('name').value = localStorage.kokName ?? '';
 document.querySelector('form').onsubmit = e => {
   e.preventDefault();
   if ($('go').disabled) return;
   wake();
-  start($('name').value);
+  localStorage.kokName = $('name').value.trim();
+  $('name').blur(); // keys go to the game from here on
+  start($('name').value, myLook);
   $('join').classList.add('gone');
-  setTimeout(() => $('join').remove(), 900);
+  setTimeout(() => { $('heroes').classList.add('panel'); document.body.append($('heroes')); $('join').remove(); }, 900); // the picker stays for the muster
   $('stats').hidden = $('help').hidden = false;
   joined = true;
+  heroUI();
 };
+heroUI();
+
+// ---------- chat: Enter (or T) to speak, Enter to send, Esc to stop ----------
+const chatIn = $('chatIn');
+function openChat() {
+  $('chat').classList.add('open');
+  chatIn.focus();
+  held.length = 0; // stop running while we type
+  sendDir();
+}
+chatIn.addEventListener('keydown', e => {
+  e.stopPropagation(); // typing isn't playing
+  if (e.key === 'Enter') {
+    const text = chatIn.value.trim();
+    if (text) send({ t: 'chat', text });
+    chatIn.value = '';
+    chatIn.blur();
+  } else if (e.key === 'Escape') { chatIn.value = ''; chatIn.blur(); }
+});
+chatIn.addEventListener('blur', () => $('chat').classList.remove('open'));
 
 const KEYS = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
 const held = [];
 let dir = null;
 function sendDir() {
-  const d = held.at(-1) ?? padDir;
+  const d = inMuster() || document.activeElement === chatIn ? null : held.at(-1) ?? padDir;
   if (d !== dir) send({ t: 'dir', d: dir = d });
 }
 addEventListener('keydown', e => {
-  if (!joined || !$('notice').hidden) return;
+  if (!joined || !$('notice').hidden || e.target instanceof HTMLInputElement) return;
   document.body.classList.remove('pad'); // show keyboard hints again
   const d = KEYS[e.code];
-  if (d) { e.preventDefault(); if (!held.includes(d)) held.push(d); sendDir(); }
+  if (e.code === 'Enter' || e.code === 'KeyT') { e.preventDefault(); openChat(); }
+  else if (d && inMuster()) { e.preventDefault(); if (!e.repeat && (d === 'left' || d === 'right')) cycleHero(d === 'left' ? -1 : 1); }
+  else if (d) { e.preventDefault(); if (!held.includes(d)) held.push(d); sendDir(); }
   else if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) send({ t: 'bomb' }); }
-  else if (e.code === 'KeyI' && party) $('party').hidden ? party() : ($('party').hidden = true);
+  else if (e.code === 'KeyI') toggleParty();
   else if (e.code === 'KeyM' && master) master.gain.value = (muted = !muted) ? 0 : .6;
   else if (e.code === 'KeyN') music.toggle();
 });
@@ -1367,28 +1641,32 @@ addEventListener('keyup', e => {
 });
 addEventListener('blur', () => { held.length = 0; sendDir(); });
 
-// ---------- gamepads (standard mapping): stick or d-pad moves, A/X bomb, Back opens the war party ----------
-// Title screen: up/down switches mode, A or Start goes to battle.
+// ---------- gamepads (standard mapping): stick or d-pad moves, A/X bomb, Back opens the war party, Start starts ----------
+// Menus: left/right (or LB/RB) picks a hero, up/down switches mode, A or Start goes to battle.
 const PAD_NAMES = ['Sir Fuse', 'Lady Kaboom', 'Boomhilda', 'Sir Blastalot', 'Wickmund', 'Dame Ember'];
 let padDir = null, padNav = null, padWas = new Set();
 function rumble(strong, weak, ms) {
   for (const gp of navigator.getGamepads?.() ?? []) gp?.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak })?.catch(() => {});
 }
 function padStep(d) {
-  if (!$('notice').hidden) return;
-  if (!joined && (d === 'up' || d === 'down') && $('modes') && !$('modes').hidden) document.querySelector('#modes button:not(.on)')?.click();
+  if (document.activeElement === chatIn || !$('notice').hidden) return;
+  if ((!joined || inMuster()) && (d === 'left' || d === 'right')) cycleHero(d === 'left' ? -1 : 1);
+  else if (!joined && $('modes') && !$('modes').hidden) document.querySelector('#modes button:not(.on)')?.click();
 }
 function padPress(i) {
   document.body.classList.add('pad');
   wake(); // may stay silent until a real click or key: browsers don't count gamepads as a gesture
+  if (document.activeElement === chatIn) return;
   if (!$('notice').hidden) { if (i === 0) $('soloLink').click(); return; }
+  if (i === 4 || i === 5) return (!joined || inMuster()) && cycleHero(i === 4 ? -1 : 1);
   if (!joined) {
     if (i !== 0 && i !== 9) return;
     if (!$('name').value.trim()) $('name').value = anyOf(PAD_NAMES);
     return document.querySelector('form').requestSubmit();
   }
+  if (inMuster()) return i === 9 && hostCtl?.begin();
   if (i === 0 || i === 2) send({ t: 'bomb' });
-  else if (i === 8 && party) $('party').hidden ? party() : ($('party').hidden = true);
+  else if (i === 8) toggleParty();
 }
 function pollPads() {
   let d = null;
@@ -1423,8 +1701,9 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-let camBlend = 0, podiumK = 0;
+let camBlend = 0, stageK = 0;
 const podiumCam = new THREE.Vector3(CX, 2.4, CZ + 5.2), podiumLook = new THREE.Vector3(CX, .95, CZ), look = new THREE.Vector3();
+const lobbyCam = new THREE.Vector3(), lobbyLook = new THREE.Vector3(CX, .8, CZ), stageCam = new THREE.Vector3(), stageLook = new THREE.Vector3();
 const orbit = new THREE.Vector3(), gameCam = new THREE.Vector3();
 function updateCamera(dt) {
   const fit = Math.max(1, 1.5 / camera.aspect); // pull back on narrow screens
@@ -1432,12 +1711,20 @@ function updateCamera(dt) {
   gameCam.set(CX + Math.sin(time * .25) * .25, 15.5 * fit, CZ + 10.6 * fit);
   if (joined) camBlend = Math.min(1, camBlend + dt * .6);
   const k = camBlend * camBlend * (3 - 2 * camBlend);
-  podiumK += ((podium.visible ? 1 : 0) - podiumK) * Math.min(1, dt * 1.5); // swoop in for the ceremony
-  camera.position.lerpVectors(orbit, gameCam, k).lerp(podiumCam, podiumK);
+  if (stage) { // swoop in for the muster's line-up or the podium ceremony; glide between the two
+    const dist = Math.min(9, Math.max(5.5, stageN * 1.05 + 3)) * fit;
+    lobbyCam.set(CX + Math.sin(time * .2) * .3, 1.4 + dist * .22, CZ + dist);
+    const [c, l] = stage === 'lobby' ? [lobbyCam, lobbyLook] : [podiumCam, podiumLook], g = 1 - Math.exp(-dt * 2.5);
+    if (stageK < .01) { stageCam.copy(c); stageLook.copy(l); }
+    stageCam.lerp(c, g);
+    stageLook.lerp(l, g);
+  }
+  stageK += ((stage ? 1 : 0) - stageK) * Math.min(1, dt * 1.5);
+  camera.position.lerpVectors(orbit, gameCam, k).lerp(stageCam, stageK);
   shake *= Math.exp(-dt * 6);
   camera.position.x += rnd(-1, 1) * shake * .3;
   camera.position.y += rnd(-1, 1) * shake * .3;
-  camera.lookAt(look.set(CX, 0, CZ + .7 * k).lerp(podiumLook, podiumK));
+  camera.lookAt(look.set(CX, 0, CZ + .7 * k).lerp(stageLook, stageK));
 }
 
 let last = performance.now();
@@ -1506,6 +1793,13 @@ renderer.setAnimationLoop(now => {
     u.mixer?.update(dt);
     u.rig.position.y = y;
     u.rig.rotation.y = u.yaw;
+    if (u.bubble) {
+      const b = u.bubble, t = b.userData.t -= dt;
+      b.visible = u.tag.visible;
+      b.position.y = u.tag.position.y + .62;
+      b.material.opacity = Math.min(1, t * 2);
+      if (t <= 0) { g.remove(b); b.material.map.dispose(); b.material.dispose(); u.bubble = null; }
+    }
     if (u.ring) { u.ring.visible = u.die < 0; u.ring.rotation.y = time * .8; u.ring.material.opacity = .7 + Math.sin(time * 4) * .25; }
     if (moving && g.visible && Math.random() < dt * 8) smokePuff(g.position.x, .05, g.position.z, 1, [.25, .22, .2], .25, .1);
   }
