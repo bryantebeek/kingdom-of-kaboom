@@ -142,7 +142,7 @@
 <div id="stats" class="panel" hidden></div>
 <div id="spec" hidden>FALLEN — AWAITING NEXT ROUND</div>
 <div id="banner"></div>
-<div id="help" class="panel" hidden><span><kbd>WASD</kbd>move</span><span><kbd>SPACE</kbd>bomb</span><span><kbd>M</kbd>mute</span><span id="invite" style="cursor:pointer"><kbd>I</kbd>war party</span></div>
+<div id="help" class="panel" hidden><span><kbd>WASD</kbd>move</span><span><kbd>SPACE</kbd>bomb</span><span><kbd>M</kbd>mute</span><span><kbd>N</kbd>music</span><span id="invite" style="cursor:pointer"><kbd>I</kbd>war party</span></div>
 <div id="party" class="panel" hidden>
   <h3><span>⚑ WAR PARTY</span><button class="x" id="partyX" title="Close (I)">×</button></h3>
   <p>Send this link to thine allies. They join next round.</p>
@@ -866,23 +866,24 @@ function initAudio() {
   noiseBuf = ac.createBuffer(1, ac.sampleRate * 1.5, ac.sampleRate);
   noiseBuf.getChannelData(0).forEach((_, i, d) => { d[i] = Math.random() * 2 - 1; });
 }
-function tone(f, dur, type = 'sine', vol = .2, f2 = f, delay = 0) {
+function tone(f, dur, type = 'sine', vol = .2, f2 = f, delay = 0, out = master) {
   if (!ac) return;
   const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
   o.type = type;
   o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  o.connect(g).connect(master);
+  o.connect(g).connect(out);
   o.start(t); o.stop(t + dur);
 }
-function noise(dur, vol, f1, f2) {
+function noise(dur, vol, f1, f2, delay = 0, out = master, type = 'lowpass', q = 1) {
   if (!ac) return;
-  const t = ac.currentTime, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  const t = ac.currentTime + delay, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
   s.buffer = noiseBuf;
-  f.type = 'lowpass';
+  f.type = type;
+  f.Q.value = q;
   f.frequency.setValueAtTime(f1, t); f.frequency.exponentialRampToValueAtTime(f2, t + dur);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  s.connect(f).connect(g).connect(master);
+  s.connect(f).connect(g).connect(out);
   s.start(t); s.stop(t + dur);
 }
 const arp = (base, notes, len, type, vol, gap) => notes.forEach((n, i) => tone(base * 2 ** (n / 12), len, type, vol, base * 2 ** (n / 12), i * gap));
@@ -895,6 +896,100 @@ const sfx = {
   win: () => arp(392, [0, 4, 7, 12], .5, 'triangle', .18, .12),
   fight: () => { tone(196, .7, 'sawtooth', .1); tone(294, .9, 'sawtooth', .1, 294, .18); noise(.3, .15, 3000, 400); }, // war horn
 };
+
+// ---------- music: a little band of oscillators. Harp and drone in the menus, drums and flute in battle ----------
+// Eight bars in D dorian, Dm C Bb C | Dm C Bb A, looped. Moods switch on a bar line and restart the phrase.
+const CHORDS = [[0, 3], [-2, 4], [-4, 4], [-2, 4], [0, 3], [-2, 4], [-4, 4], [-5, 4]]; // [root, third] in semitones from D
+const TUNE = [ // flute: [semitones above D4, length in eighths]
+  [[12, 2], [7, 2], [12, 1], [14, 1], [15, 1], [14, 1]], [[10, 2], [7, 1], [5, 1], [7, 2], [10, 2]],
+  [[8, 2], [12, 2], [15, 3], [14, 1]], [[12, 2], [10, 2], [14, 4]],
+  [[12, 2], [7, 2], [12, 1], [14, 1], [15, 1], [17, 1]], [[19, 2], [17, 1], [15, 1], [14, 2], [10, 2]],
+  [[8, 1], [10, 1], [12, 2], [15, 2], [12, 2]], [[14, 2], [11, 2], [9, 1], [11, 1], [7, 2]],
+];
+const BPM = { calm: 84, battle: 128 }, MUSIC_VOL = .55;
+const hz = n => 293.66 * 2 ** (n / 12); // semitones from D4
+const music = {
+  on: localStorage.kokMusic !== 'off', mood: 'calm', want: 'calm', step: 0, next: 0,
+  start() {
+    if (this.bus || !ac) return;
+    this.bus = ac.createGain();
+    this.bus.gain.value = this.on ? MUSIC_VOL : 0;
+    this.bus.connect(master);
+    // Drone: a fifth on D, like a hurdy-gurdy, breathing through a slow filter.
+    const lp = ac.createBiquadFilter(), lfo = ac.createOscillator(), depth = ac.createGain();
+    this.drone = ac.createGain();
+    this.drone.gain.value = 0;
+    lp.frequency.value = 420;
+    lfo.frequency.value = .09; depth.gain.value = 160;
+    lfo.connect(depth).connect(lp.frequency);
+    for (const [n, d] of [[-24, -4], [-24, 5], [-17, 0]]) { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(n); o.detune.value = d; o.connect(lp); o.start(); }
+    lp.connect(this.drone).connect(this.bus);
+    lfo.start();
+    this.next = ac.currentTime + .1;
+    setInterval(() => this.schedule(), 25);
+  },
+  set(mood) { this.want = mood; },
+  toggle() {
+    this.on = !this.on;
+    localStorage.kokMusic = this.on ? 'on' : 'off';
+    this.bus?.gain.setTargetAtTime(this.on ? MUSIC_VOL : 0, ac.currentTime, .15);
+    toast(`<span style="color:var(--gold)">♪</span><em>Music ${this.on ? 'on' : 'off'}</em>`);
+  },
+  schedule() {
+    if (this.next < ac.currentTime) this.next = ac.currentTime + .05; // the tab slept: skip ahead instead of playing a pile-up
+    while (this.next < ac.currentTime + .15) {
+      if (this.step % 16 === 0 && this.want !== this.mood) {
+        this.mood = this.want;
+        this.step = 0;
+        this.drone.gain.setTargetAtTime(this.mood === 'battle' ? .05 : .035, this.next, 1.5);
+      }
+      this.play(this.step, this.next - ac.currentTime);
+      this.next += 60 / BPM[this.mood] / 4;
+      this.step++;
+    }
+  },
+  play(i, at) { // one sixteenth note
+    const out = this.bus, s = i % 16, bar = Math.floor(i / 16) % 8, [root, third] = CHORDS[bar], battle = this.mood === 'battle', beat = 60 / BPM[this.mood];
+    if (s % 2 === 0) { // harp rolls through the chord in eighths
+      const n = root - 12 + [0, 7, 12, 12 + third, 19, 12 + third, 12, 7][s / 2];
+      this.pluck(hz(n), at, battle ? .045 : .06);
+    }
+    if (s === 0 && !battle) this.voice('triangle', hz(root - 24), at, beat * 4, .14, .02, 600);
+    if (battle && [0, 3, 6, 8, 11, 14].includes(s)) this.voice('triangle', hz(root - 24), at, beat * .7, .2, .005, 900); // galloping bass
+    let t = 0;
+    for (const [n, len] of TUNE[bar]) { // flute: every loop in battle, every other loop in the menus
+      if (t === s && (battle || Math.floor(i / 128) % 2)) this.voice('triangle', hz(n), at, len * beat / 2, battle ? .085 : .06, .04, 3200, .006);
+      t += len * 2;
+    }
+    if (!battle) { if (s === 0 || s === 10) this.drum(at, .18); return; }
+    if (s === 0 || s === 8 || s === 6) { tone(140, .3, 'sine', .55, 42, at, out); } // kick
+    if (s === 4 || s === 12) { noise(.12, .3, 2400, 1500, at, out, 'bandpass', .8); tone(330, .06, 'triangle', .15, 180, at, out); } // frame drum slap
+    if (s % 2) noise(.04, s % 4 === 1 ? .05 : .09, 9000, 7000, at, out, 'highpass'); // shaker
+    if (bar === 7 && s >= 12) this.drum(at, .16 + (s - 12) * .05); // a roll back into the top
+  },
+  pluck(f, at, vol) { this.voice('sawtooth', f, at, 1.1, vol, .004, 2600, 0, 260); },
+  drum(at, vol) { tone(95, .45, 'sine', vol * 2, 55, at, this.bus); noise(.2, vol * .5, 500, 200, at, this.bus); },
+  voice(type, f, at, dur, vol, attack, cutoff, vib = 0, cutEnd = cutoff) {
+    const t = ac.currentTime + Math.max(0, at), o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
+    o.type = type;
+    o.frequency.value = f;
+    lp.frequency.setValueAtTime(cutoff, t); lp.frequency.exponentialRampToValueAtTime(cutEnd, t + dur);
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + attack);
+    g.gain.setTargetAtTime(.0001, t + Math.max(attack, dur * .75), dur * .12 + .03); // hold, then let it ring out
+    if (vib) {
+      const l = ac.createOscillator(), d = ac.createGain();
+      l.frequency.value = 5.3; d.gain.value = f * vib;
+      l.connect(d).connect(o.frequency);
+      l.start(t); l.stop(t + dur * 1.6);
+    }
+    o.connect(lp).connect(g).connect(this.bus);
+    o.start(t); o.stop(t + dur * 1.6 + .1);
+  },
+};
+const wake = () => { initAudio(); music.start(); }; // browsers only allow sound after the first click or key
+addEventListener('pointerdown', wake, { once: true });
+addEventListener('keydown', wake, { once: true });
 
 // ---------- effects from server events ----------
 function boomFx(x, z, sound) {
@@ -951,6 +1046,7 @@ function apply(s) {
     round = s.round;
     gen++; // fresh meshes (and pop-in) for the new layout
   }
+  music.set(joined && !s.podium ? 'battle' : 'calm');
   sync(walls, [...s.grid].flatMap((c, i) => {
     const x = i % W, y = Math.floor(i / W);
     return c === '#' && x > 0 && y > 0 && x < W - 1 && y < H - 1 ? [i] : [];
@@ -1225,7 +1321,7 @@ $('copy').onclick = () => {
 document.querySelector('form').onsubmit = e => {
   e.preventDefault();
   if ($('go').disabled) return;
-  initAudio();
+  wake();
   start($('name').value);
   $('join').classList.add('gone');
   setTimeout(() => $('join').remove(), 900);
@@ -1247,6 +1343,7 @@ addEventListener('keydown', e => {
   else if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) send({ t: 'bomb' }); }
   else if (e.code === 'KeyI' && party) $('party').hidden ? party() : ($('party').hidden = true);
   else if (e.code === 'KeyM' && master) master.gain.value = (muted = !muted) ? 0 : .6;
+  else if (e.code === 'KeyN') music.toggle();
 });
 addEventListener('keyup', e => {
   const i = held.indexOf(KEYS[e.code]);
