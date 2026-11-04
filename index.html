@@ -1644,9 +1644,12 @@ addEventListener('blur', () => { held.length = 0; sendDir(); });
 // ---------- gamepads (standard mapping): stick or d-pad moves, A/X bomb, Back opens the war party, Start starts ----------
 // Menus: left/right (or LB/RB) picks a hero, up/down switches mode, A or Start goes to battle.
 const PAD_NAMES = ['Sir Fuse', 'Lady Kaboom', 'Boomhilda', 'Sir Blastalot', 'Wickmund', 'Dame Ember'];
+// Only real controllers: Linux also exposes things like virtual mice and Stream Deck plugins as joysticks,
+// whose axes and buttons would steer and click on their own. 'standard' means the browser knows the layout.
+const pads = () => [...navigator.getGamepads?.() ?? []].filter(gp => gp?.connected && gp.mapping === 'standard');
 let padDir = null, padNav = null, padWas = new Set();
 function rumble(strong, weak, ms) {
-  for (const gp of navigator.getGamepads?.() ?? []) gp?.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak })?.catch(() => {});
+  for (const gp of pads()) gp.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak })?.catch(() => {});
 }
 function padStep(d) {
   if (document.activeElement === chatIn || !$('notice').hidden) return;
@@ -1671,8 +1674,7 @@ function padPress(i) {
 function pollPads() {
   let d = null;
   const down = new Set();
-  for (const gp of navigator.getGamepads?.() ?? []) {
-    if (!gp?.connected) continue;
+  for (const gp of pads()) {
     const b = i => gp.buttons[i]?.pressed, [ax = 0, ay = 0] = gp.axes;
     d ??= b(12) ? 'up' : b(13) ? 'down' : b(14) ? 'left' : b(15) ? 'right'
       : Math.hypot(ax, ay) < .5 ? null : Math.abs(ax) > Math.abs(ay) ? (ax < 0 ? 'left' : 'right') : ay < 0 ? 'up' : 'down';
@@ -1684,6 +1686,7 @@ function pollPads() {
   padDir = d;
   if (joined) sendDir();
 }
+  if (e.gamepad.mapping !== 'standard') return;
 addEventListener('gamepadconnected', e => {
   document.body.classList.add('pad');
   toast(`<span style="color:var(--gold)">🎮</span> <b>${esc(e.gamepad.id.replace(/\s*\(.*$/, '').slice(0, 32) || 'Controller')}</b><em>is ready</em>`);
