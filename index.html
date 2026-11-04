@@ -123,6 +123,11 @@
   #notice .btn { padding: 11px 22px; font-size: 16px; }
   .keys { display: flex; gap: 22px; font-size: 16px; color: #e0cda6; text-shadow: 0 1px 0 #000; }
 
+  .p { display: none !important; }
+  body.pad .p { display: inline-block !important; }
+  body.pad .k { display: none !important; }
+  kbd.pa { min-width: 24px; padding: 1px 0; border-radius: 50%; background: #24461a; border-color: #6fbf4a; color: #dff5cf; }
+
   @keyframes pop { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } }
   @keyframes slide { from { transform: translateX(-40px); opacity: 0; } }
   @keyframes fade { to { transform: translateX(-20px); opacity: 0; } }
@@ -142,7 +147,7 @@
 <div id="stats" class="panel" hidden></div>
 <div id="spec" hidden>FALLEN — AWAITING NEXT ROUND</div>
 <div id="banner"></div>
-<div id="help" class="panel" hidden><span><kbd>WASD</kbd>move</span><span><kbd>SPACE</kbd>bomb</span><span><kbd>M</kbd>mute</span><span><kbd>N</kbd>music</span><span id="invite" style="cursor:pointer"><kbd>I</kbd>war party</span></div>
+<div id="help" class="panel" hidden><span><kbd class="k">WASD</kbd><kbd class="p">✣</kbd>move</span><span><kbd class="k">SPACE</kbd><kbd class="p pa">A</kbd>bomb</span><span><kbd>M</kbd>mute</span><span><kbd>N</kbd>music</span><span id="invite" style="cursor:pointer"><kbd class="k">I</kbd><kbd class="p">⧉</kbd>war party</span></div>
 <div id="party" class="panel" hidden>
   <h3><span>⚑ WAR PARTY</span><button class="x" id="partyX" title="Close (I)">×</button></h3>
   <p>Send this link to thine allies. They join next round.</p>
@@ -164,7 +169,8 @@
   <form class="panel"><input id="name" placeholder="Thy name, hero" maxlength="16" required autofocus autocomplete="off"><button id="go">TO BATTLE</button></form>
   <div class="foes" id="foes"><span id="foesLabel">OPPONENTS</span><button type="button" data-n="0" hidden>0</button><button type="button" data-n="1">1</button><button type="button" data-n="2" class="on">2</button><button type="button" data-n="3">3</button></div>
   <div class="foes" id="tourney" hidden><span>FIRST TO</span><button type="button" data-t="0" title="Endless rounds">∞</button><button type="button" data-t="1">1</button><button type="button" data-t="2" class="on">2</button><button type="button" data-t="3">3</button></div>
-  <div class="keys"><span><kbd>WASD</kbd><kbd>↑↓←→</kbd>move</span><span><kbd>SPACE</kbd>drop bomb</span><span><kbd>M</kbd>mute</span></div>
+  <div class="keys"><span class="k"><kbd>WASD</kbd><kbd>↑↓←→</kbd>move</span><span class="k"><kbd>SPACE</kbd>drop bomb</span><span class="k"><kbd>M</kbd>mute</span>
+    <span class="p">🎮 Controller ready: <kbd class="pa">A</kbd>to battle</span></div>
 </div>
 <script type="module">
 import * as THREE from 'three';
@@ -1031,6 +1037,7 @@ function fallFacing(x, y, yaw) {
   const keep = opts.find(o => o.free && Math.abs(Math.atan2(Math.sin(o.yaw - yaw), Math.cos(o.yaw - yaw))) < .1);
   return (keep ?? opts.find(o => o.free))?.yaw ?? yaw;
 }
+const near = (x, z) => { const g = players.get(myId); return g?.visible ? Math.max(0, 1 - Math.hypot(g.position.x - x, g.position.z - z) / 6) : 0; };
 const walkable = (x, y) => grid[y * W + x] === '.' && !bombTiles.has(y * W + x) && !bodies.has(y * W + x);
 let gen = 0, myId, joined = false, round, lastMsg = '', shake = 0, time = 0, hudHtml = '';
 
@@ -1065,7 +1072,10 @@ function apply(s) {
   sync(players, s.players, p => p.id, makeBomber, (g, p) => {
     const u = g.userData;
     Object.assign(u, { tx: p.x, ty: p.y, delay: p.delay, m: p.m, d: p.d, recv: time });
-    if (u.alive && !p.alive) { u.die = 0; u.yawT = fallFacing(p.x, p.y, u.yaw); deathFx(g.position, p.color); }
+    if (u.alive && !p.alive) {
+      u.die = 0; u.yawT = fallFacing(p.x, p.y, u.yaw); deathFx(g.position, p.color);
+      if (p.id === myId) rumble(1, 1, 450);
+    }
     if (p.alive && (!u.alive || Math.abs(p.x - g.position.x) + Math.abs(p.y - g.position.z) > 2.5)) {
       g.position.set(p.x, 0, p.y);
       g.visible = true;
@@ -1089,11 +1099,16 @@ function apply(s) {
 
   let booms = 0;
   for (const e of s.ev) {
-    if (e.e === 'boom') boomFx(e.x, e.y, booms++ < 2);
+    if (e.e === 'boom') {
+      boomFx(e.x, e.y, booms++ < 2);
+      const k = near(e.x, e.y);
+      if (k) rumble(.7 * k, k, 160);
+    }
     else if (e.e === 'block') { debris(e.x, e.y); smokePuff(e.x, .5, e.y, 6, [.25, .17, .1], .5, .4); }
     else if (e.e === 'place') { sfx.place(); smokePuff(e.x, .1, e.y, 4, [.25, .22, .2], .3); }
     else if (e.e === 'pickup') {
       sfx.pickup();
+      if (near(e.x, e.y) > .9) rumble(0, .35, 70);
       sparks(e.x, .5, e.y, 25, hdr(ITEMS[e.k].color, 4).toArray(), 3);
     } else if (e.e === 'kill') killFeed(e);
     else if (e.e === 'join' || e.e === 'leave') { toast(`<span style="color:var(--gold)">⚑</span> <b style="color:${e.c}">${esc(e.n)}</b><em>${e.e === 'join' ? 'joined the battle' : 'left the battle'}</em>`); sfx.join(); }
@@ -1333,11 +1348,12 @@ const KEYS = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', Arrow
 const held = [];
 let dir = null;
 function sendDir() {
-  const d = held.at(-1) ?? null;
+  const d = held.at(-1) ?? padDir;
   if (d !== dir) send({ t: 'dir', d: dir = d });
 }
 addEventListener('keydown', e => {
   if (!joined || !$('notice').hidden) return;
+  document.body.classList.remove('pad'); // show keyboard hints again
   const d = KEYS[e.code];
   if (d) { e.preventDefault(); if (!held.includes(d)) held.push(d); sendDir(); }
   else if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) send({ t: 'bomb' }); }
@@ -1350,6 +1366,50 @@ addEventListener('keyup', e => {
   if (i >= 0) { held.splice(i, 1); sendDir(); }
 });
 addEventListener('blur', () => { held.length = 0; sendDir(); });
+
+// ---------- gamepads (standard mapping): stick or d-pad moves, A/X bomb, Back opens the war party ----------
+// Title screen: up/down switches mode, A or Start goes to battle.
+const PAD_NAMES = ['Sir Fuse', 'Lady Kaboom', 'Boomhilda', 'Sir Blastalot', 'Wickmund', 'Dame Ember'];
+let padDir = null, padNav = null, padWas = new Set();
+function rumble(strong, weak, ms) {
+  for (const gp of navigator.getGamepads?.() ?? []) gp?.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak })?.catch(() => {});
+}
+function padStep(d) {
+  if (!$('notice').hidden) return;
+  if (!joined && (d === 'up' || d === 'down') && $('modes') && !$('modes').hidden) document.querySelector('#modes button:not(.on)')?.click();
+}
+function padPress(i) {
+  document.body.classList.add('pad');
+  wake(); // may stay silent until a real click or key: browsers don't count gamepads as a gesture
+  if (!$('notice').hidden) { if (i === 0) $('soloLink').click(); return; }
+  if (!joined) {
+    if (i !== 0 && i !== 9) return;
+    if (!$('name').value.trim()) $('name').value = anyOf(PAD_NAMES);
+    return document.querySelector('form').requestSubmit();
+  }
+  if (i === 0 || i === 2) send({ t: 'bomb' });
+  else if (i === 8 && party) $('party').hidden ? party() : ($('party').hidden = true);
+}
+function pollPads() {
+  let d = null;
+  const down = new Set();
+  for (const gp of navigator.getGamepads?.() ?? []) {
+    if (!gp?.connected) continue;
+    const b = i => gp.buttons[i]?.pressed, [ax = 0, ay = 0] = gp.axes;
+    d ??= b(12) ? 'up' : b(13) ? 'down' : b(14) ? 'left' : b(15) ? 'right'
+      : Math.hypot(ax, ay) < .5 ? null : Math.abs(ax) > Math.abs(ay) ? (ax < 0 ? 'left' : 'right') : ay < 0 ? 'up' : 'down';
+    gp.buttons.forEach((x, i) => { if (x.pressed && (i < 12 || i > 15)) down.add(i); });
+  }
+  for (const i of down) if (!padWas.has(i)) padPress(i);
+  padWas = down;
+  if (d !== padNav) { padNav = d; if (d) { document.body.classList.add('pad'); padStep(d); } } // menus move one step per push
+  padDir = d;
+  if (joined) sendDir();
+}
+addEventListener('gamepadconnected', e => {
+  document.body.classList.add('pad');
+  toast(`<span style="color:var(--gold)">🎮</span> <b>${esc(e.gamepad.id.replace(/\s*\(.*$/, '').slice(0, 32) || 'Controller')}</b><em>is ready</em>`);
+});
 
 // ---------- frame loop ----------
 function resize() {
@@ -1385,6 +1445,7 @@ renderer.setAnimationLoop(now => {
   const dt = Math.min(.05, (now - last) / 1000);
   last = now;
   time += dt;
+  pollPads();
 
   for (const g of players.values()) {
     const u = g.userData;
