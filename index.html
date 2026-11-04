@@ -52,12 +52,12 @@
   #join { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     background: radial-gradient(ellipse at center, rgba(30, 15, 5, .1), rgba(20, 10, 4, .8)); transition: opacity .8s; }
   #join.gone { opacity: 0; pointer-events: none; }
-  .logo { text-align: center; font: 900 clamp(56px, min(11vw, 15vh), 160px)/.9 'Cinzel Decorative';
+  .logo { text-align: center; font: 900 clamp(48px, min(11vw, 12.5vh), 160px)/.9 'Cinzel Decorative';
     background: linear-gradient(180deg, #fff6d8 10%, #f3cf7a 45%, #b7792a 75%, #6e4212); -webkit-background-clip: text; background-clip: text; color: transparent;
     filter: drop-shadow(0 6px 0 #2a1406) drop-shadow(0 0 40px rgba(255, 170, 60, .5)); animation: float 4s ease-in-out infinite; }
   .logo small { display: block; font: 700 .3em 'Cinzel'; letter-spacing: .35em; margin-bottom: 6px; }
   .tag { font: 700 17px 'Cinzel'; letter-spacing: .45em; color: #f3dca8; text-shadow: 0 2px 0 #000, 0 0 16px rgba(255, 180, 80, .6); }
-  #join form { display: flex; gap: 10px; padding: 10px; margin: 14px 0 16px; }
+  #join form { display: flex; gap: 10px; padding: 10px; margin: clamp(8px, 1.5vh, 14px) 0 clamp(10px, 1.6vh, 16px); }
   #join input { width: 270px; padding: 11px 16px; border-radius: 6px; border: 2px solid var(--gold-d); outline: none;
     background: linear-gradient(180deg, #f6e7c4, #e6cf9c); color: #3a2410; font: 800 22px 'Alegreya Sans'; box-shadow: inset 0 2px 6px rgba(80, 40, 0, .35); }
   #join input::placeholder { color: #8a6a45; }
@@ -71,7 +71,7 @@
   .foes span { margin-right: 6px; }
   .foes button { width: 42px; height: 36px; border: 2px solid var(--gold-d); border-radius: 6px; cursor: pointer; background: rgba(40, 24, 12, .85); color: var(--ink); font: 900 16px 'Cinzel'; }
   #join .foes button.on { background: linear-gradient(180deg, #ffe7a0, #d19a3a); color: #2a1406; border-color: #7a4a14; }
-  .modes { display: flex; gap: 8px; padding: 7px; margin-top: 30px; }
+  .modes { display: flex; gap: 8px; padding: 7px; margin-top: clamp(12px, 3vh, 30px); }
   .modes button { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; width: 232px; padding: 9px 14px; text-align: left;
     border: 2px solid transparent; border-radius: 7px; cursor: pointer; background: rgba(0, 0, 0, .28); color: var(--ink); opacity: .72; transition: opacity .2s, background .2s, box-shadow .2s; }
   .modes button:hover { opacity: 1; background: rgba(255, 220, 150, .07); }
@@ -81,7 +81,7 @@
   .modes b { font: 900 17px 'Cinzel'; letter-spacing: .12em; text-shadow: 0 2px 0 #000; }
   .modes button.on b { color: #fff0c8; text-shadow: 0 2px 0 #000, 0 0 14px rgba(255, 190, 90, .6); }
   .modes small { font: 500 15px 'Alegreya Sans'; color: #c9b185; }
-  .summons { min-width: 486px; margin-top: 30px; padding: 12px 26px 13px; text-align: center; }
+  .summons { min-width: 486px; margin-top: clamp(12px, 3vh, 30px); padding: 12px 26px 13px; text-align: center; }
   .summons > small { display: block; margin-bottom: 7px; font: 700 13px 'Cinzel'; letter-spacing: .42em; color: var(--gold); text-shadow: 0 2px 0 #000; }
 
   .status { display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 17px; font-weight: 700; color: #ead7ae; }
@@ -130,10 +130,10 @@
   kbd.pa { min-width: 24px; padding: 1px 0; border-radius: 50%; background: #24461a; border-color: #6fbf4a; color: #dff5cf; }
 
   /* hero picker: on the title screen, then docked at the bottom of the muster */
-  #heroes { display: flex; flex-direction: column; align-items: center; gap: 9px; margin: 0 0 16px; }
+  #heroes { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0 0 clamp(8px, 1.6vh, 16px); }
   #heroes > small { font: 700 13px 'Cinzel'; letter-spacing: .42em; color: #e0cda6; text-shadow: 0 1px 0 #000; }
-  .cards { display: flex; gap: 6px; }
-  .hero { position: relative; width: 64px; height: 80px; padding: 0; border: 2px solid var(--gold-d); border-radius: 8px; cursor: pointer; overflow: hidden;
+  .cards { --card: 64px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 6px; max-width: calc(5 * var(--card) + 4 * 6px); } /* 5 over 4 */
+  .hero { position: relative; width: var(--card); height: calc(var(--card) * 1.25); padding: 0; border: 2px solid var(--gold-d); border-radius: 8px; cursor: pointer; overflow: hidden;
     background: radial-gradient(ellipse at 50% 28%, #5a3d22, #1e130a 78%); box-shadow: inset 0 0 0 1px rgba(255, 220, 150, .14), 0 4px 10px rgba(0, 0, 0, .5);
     transition: transform .18s cubic-bezier(.2, 1.4, .4, 1), box-shadow .2s, border-color .2s; }
   .hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s; }
@@ -141,7 +141,7 @@
   .hero:not(.ready)::before { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 230, 170, .14) 50%, transparent 70%) 0 0 / 200% 100%;
     animation: shimmer 1.2s linear infinite; }
   .hero:hover { transform: translateY(-3px); border-color: #c8973f; }
-  .hero.on { border-color: var(--gold); transform: translateY(-6px) scale(1.07); background: radial-gradient(ellipse at 50% 28%, #b07a30, #2a1a0c 78%);
+  .hero.on { border-color: var(--gold); transform: translateY(-3px) scale(1.07); background: radial-gradient(ellipse at 50% 28%, #b07a30, #2a1a0c 78%);
     box-shadow: 0 0 0 2px rgba(255, 230, 170, .3), 0 0 24px rgba(255, 170, 60, .6), 0 8px 16px rgba(0, 0, 0, .5); }
   .hero.taken { cursor: not-allowed; border-color: #4a3420; transform: none; }
   .hero.taken img { filter: grayscale(1) brightness(.4); }
@@ -190,8 +190,7 @@
 
   body.lobby #help { display: none; }
   body.lobby #chat { bottom: 22px; }
-  @media (max-width: 1500px) { .hero { width: 54px; height: 68px; } #chat { width: 300px; } .pick b { min-width: 200px; } }
-  @media (max-width: 1400px) { body > #heroes .hero { width: 50px; height: 62px; } }
+  @media (max-width: 1500px) { #chat { width: 300px; } }
 
   @keyframes shimmer { to { background-position: -200% 0; } }
   @keyframes nope { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
@@ -1644,10 +1643,10 @@ addEventListener('blur', () => { held.length = 0; sendDir(); });
 // ---------- gamepads (standard mapping): stick or d-pad moves, A/X bomb, Back opens the war party, Start starts ----------
 // Menus: left/right (or LB/RB) picks a hero, up/down switches mode, A or Start goes to battle.
 const PAD_NAMES = ['Sir Fuse', 'Lady Kaboom', 'Boomhilda', 'Sir Blastalot', 'Wickmund', 'Dame Ember'];
+let padDir = null, padNav = null, padWas = new Set();
 // Only real controllers: Linux also exposes things like virtual mice and Stream Deck plugins as joysticks,
 // whose axes and buttons would steer and click on their own. 'standard' means the browser knows the layout.
 const pads = () => [...navigator.getGamepads?.() ?? []].filter(gp => gp?.connected && gp.mapping === 'standard');
-let padDir = null, padNav = null, padWas = new Set();
 function rumble(strong, weak, ms) {
   for (const gp of pads()) gp.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak })?.catch(() => {});
 }
@@ -1686,8 +1685,8 @@ function pollPads() {
   padDir = d;
   if (joined) sendDir();
 }
-  if (e.gamepad.mapping !== 'standard') return;
 addEventListener('gamepadconnected', e => {
+  if (e.gamepad.mapping !== 'standard') return;
   document.body.classList.add('pad');
   toast(`<span style="color:var(--gold)">🎮</span> <b>${esc(e.gamepad.id.replace(/\s*\(.*$/, '').slice(0, 32) || 'Controller')}</b><em>is ready</em>`);
 });
