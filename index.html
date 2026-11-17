@@ -17,7 +17,7 @@
   .panel { background: linear-gradient(180deg, rgba(56, 36, 21, .9), rgba(30, 19, 11, .92)); border: 2px solid var(--gold-d); border-radius: 10px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(255, 220, 150, .18), inset 0 0 24px rgba(0, 0, 0, .5); }
 
-  #board { position: fixed; top: 20px; right: 20px; width: 270px; padding: 12px 12px 10px; }
+  #board { position: fixed; top: 20px; right: 20px; width: 300px; padding: 12px 12px 10px; }
   #board h3, #party h3 { margin: 0 4px 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(232, 193, 112, .3); font: 700 14px 'Cinzel'; letter-spacing: .16em;
     color: var(--gold); display: flex; justify-content: space-between; text-shadow: 0 2px 0 #000; }
   #board h3 span:last-child { letter-spacing: .04em; white-space: nowrap; }
@@ -27,6 +27,9 @@
   .row.dead .n { text-decoration: line-through; }
   .chip { width: 12px; height: 12px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px rgba(0, 0, 0, .55), 0 0 8px currentColor; flex: none; }
   .n { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pw { display: flex; gap: 4px; font: 900 12px 'Cinzel'; color: #cdb68c; }
+  .pw span { display: flex; align-items: center; gap: 1px; }
+  .pw img { width: 16px; height: 16px; }
   .s { font: 900 19px 'Cinzel'; color: var(--gold); text-shadow: 0 2px 0 #000; }
 
   #feed { position: fixed; top: 20px; left: 20px; display: flex; flex-direction: column; gap: 6px; }
@@ -1346,6 +1349,7 @@ function chatLine(e) {
   const g = bomber(e.id);
   if (g?.visible) say(g, String(e.text));
 }
+const powers = p => [[ITEMS.b, p.maxBombs], [ITEMS.r, p.range], [ITEMS.s, Math.round((0.2 - p.delay) / 0.025) + 1]];
 function hud(s) {
   const fighters = s.players.filter(p => p.alive).length;
   const head = s.lobby ? `${fighters} / 8` : `ROUND ${s.round}`, title = s.lobby ? 'THE MUSTER' : s.firstTo ? `FIRST TO ${s.firstTo}` : 'CHAMPIONS';
@@ -1355,7 +1359,7 @@ function hud(s) {
   const row = (p, right) => `<div class="row${p.id === myId ? ' me' : ''}${p.alive ? '' : ' dead'}"><span class="chip" style="color:${col(p.color)}"></span><span class="n">${esc(p.name)}</span>${right}</div>`;
   const html = s.lobby
     ? s.players.map(p => row(p, `<span class="cls">${p.id === s.host ? '⚑ ' : ''}${HEROES[p.look] ?? ''}</span>`)).join('')
-    : [...s.players].sort((a, b) => b.score - a.score).map(p => row(p, `<span class="s">${p.score}</span>`)).join('');
+    : [...s.players].sort((a, b) => b.score - a.score).map(p => row(p, `<span class="pw">${powers(p).map(([it, v]) => `<span><img src="${it.url}">${v}</span>`).join('')}</span><span class="s">${p.score}</span>`)).join('');
   const host = s.players.find(p => p.id === s.host);
   const key = html + JSON.stringify([me && [me.maxBombs, me.range, me.delay, me.alive], s.round, s.lobby, s.firstTo, host?.name, joined]);
   if (key === hudHtml) return;
@@ -1371,8 +1375,7 @@ function hud(s) {
     $('begin').firstChild.textContent = fighters < 2 ? '⚔ AWAITING FOES ' : '⚔ START BATTLE ';
   }
   if (!me) return;
-  $('stats').innerHTML = [[ITEMS.b, me.maxBombs], [ITEMS.r, me.range], [ITEMS.s, Math.round((0.2 - me.delay) / 0.025) + 1]]
-    .map(([it, v]) => `<div class="stat"><img src="${it.url}">${v}</div>`).join('');
+  $('stats').innerHTML = powers(me).map(([it, v]) => `<div class="stat"><img src="${it.url}">${v}</div>`).join('');
   if (me.alive) hud.aliveIn = s.round;
   $('spec').hidden = me.alive || !!s.podium || !!s.lobby;
   $('spec').textContent = hud.aliveIn === s.round ? 'FALLEN — AWAITING NEXT ROUND' : 'SPECTATING — THOU JOINEST NEXT ROUND';
