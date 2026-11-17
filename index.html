@@ -27,8 +27,9 @@
   .row.dead .n { text-decoration: line-through; }
   .chip { width: 12px; height: 12px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px rgba(0, 0, 0, .55), 0 0 8px currentColor; flex: none; }
   .n { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pw { display: flex; gap: 4px; font: 900 12px 'Cinzel'; color: #cdb68c; }
-  .pw span { display: flex; align-items: center; gap: 1px; }
+  .row:has(.pw) .n { flex: 0 1 auto; } /* power-ups sit right after the name, score stays right */
+  .pw { flex: 1 0 auto; display: flex; gap: 10px; font: 900 12px 'Cinzel'; color: #cdb68c; }
+  .pw span { display: flex; align-items: center; gap: 2px; }
   .pw img { width: 16px; height: 16px; }
   .s { font: 900 19px 'Cinzel'; color: var(--gold); text-shadow: 0 2px 0 #000; }
 
