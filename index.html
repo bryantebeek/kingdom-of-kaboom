@@ -33,7 +33,7 @@
   .s { font: 900 19px 'Cinzel'; color: var(--gold); text-shadow: 0 2px 0 #000; }
 
   #tl { position: fixed; top: 20px; left: 20px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-  #feed { display: flex; flex-direction: column; gap: 6px; }
+  #feed { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 300px; height: 170px; overflow: hidden; pointer-events: none; }
   .kill { padding: 6px 14px; font-size: 18px; font-weight: 800; animation: slide .35s cubic-bezier(.2, 1.4, .4, 1), fade .6s 4.2s forwards; }
   .kill em { font-style: normal; font-weight: 500; color: #ffb36b; margin: 0 6px; }
 
@@ -193,6 +193,7 @@
   #chatIn::placeholder { color: #8a7458; }
   #chatIn:focus { border-color: var(--gold); box-shadow: inset 0 2px 6px rgba(0, 0, 0, .5), 0 0 0 3px rgba(232, 193, 112, .25); }
   #chat.open .line, body.lobby .line { animation: none; }
+  body:not(.lobby) #log { height: 90px; } /* a fixed footprint the camera fits the arena around; lines also show over heads */
 
   body.lobby #help { display: none; }
   @media (max-width: 1500px) { #chat { width: 300px; } }
@@ -1703,7 +1704,7 @@ function resize() {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   const px = innerHeight * renderer.getPixelRatio() / (2 * Math.tan(camera.fov * Math.PI / 360));
-  smoke.mat.uniforms.scale.value = fx.mat.uniforms.scale.value = px;
+  resize.px = px;
 }
 addEventListener('resize', resize);
 resize();
@@ -1712,10 +1713,65 @@ let camBlend = 0, stageK = 0;
 const podiumCam = new THREE.Vector3(CX, 2.4, CZ + 5.2), podiumLook = new THREE.Vector3(CX, .95, CZ), look = new THREE.Vector3();
 const lobbyCam = new THREE.Vector3(), lobbyLook = new THREE.Vector3(CX, .8, CZ), stageCam = new THREE.Vector3(), stageLook = new THREE.Vector3();
 const orbit = new THREE.Vector3(), gameCam = new THREE.Vector3();
+const camFit = aspect => Math.max(1, 1.5 / aspect); // pull back on narrow screens
+const battleCam = (v, aspect, sway = 0) => v.set(CX + sway, 15.5 * camFit(aspect), CZ + 10.6 * camFit(aspect));
+const battleLook = new THREE.Vector3(CX, 0, CZ + .7);
+
+// ---------- keep the HUD off the arena ----------
+// Shrink and shift the battle picture through the projection (the scene itself is untouched) until the arena's
+// outline on screen clears every HUD panel. Refits whenever the window or a panel changes size.
+const HUD = ['tl', 'chat', 'board', 'stats'].map($);
+const arenaPts = [-.75, W - .25].flatMap(x => [-.75, H - .5].flatMap(z => [0, 1.3].map(y => new THREE.Vector3(x, y, z))));
+const fitCam = new THREE.PerspectiveCamera(camera.fov, 1, .5, 300);
+const view = { s: 1, x: 0, y: 0, key: '' };
+function hull(pts) { // convex hull, monotone chain
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = ps => { const h = []; for (const q of ps) { while (h.length > 1 && cross(h.at(-2), h.at(-1), q) <= 0) h.pop(); h.push(q); } h.pop(); return h; };
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  return [...half(pts), ...half([...pts].reverse())];
+}
+function overlaps(poly, r) { // separating axis test: convex polygon vs box
+  const box = [[r[0], r[1]], [r[2], r[1]], [r[0], r[3]], [r[2], r[3]]];
+  const axes = [[1, 0], [0, 1], ...poly.map((a, i) => { const b = poly[(i + 1) % poly.length]; return [a[1] - b[1], b[0] - a[0]]; })];
+  const span = (pts, [ax, ay]) => pts.reduce(([lo, hi], [x, y]) => [Math.min(lo, x * ax + y * ay), Math.max(hi, x * ax + y * ay)], [Infinity, -Infinity]);
+  return axes.every(a => { const [p0, p1] = span(poly, a), [b0, b1] = span(box, a); return p1 > b0 && b1 > p0; });
+}
+function fitView() {
+  const vw = innerWidth, vh = innerHeight, pad = 10;
+  const rects = HUD.map(e => e.getBoundingClientRect()).filter(r => r.width && r.height)
+    .map(r => [r.left - pad, r.top - pad, r.right + pad, r.bottom + pad].map(Math.round));
+  const key = JSON.stringify([vw, vh, rects]);
+  if (key === view.key) return;
+  view.key = key;
+  fitCam.aspect = vw / vh;
+  fitCam.updateProjectionMatrix();
+  battleCam(fitCam.position, fitCam.aspect);
+  fitCam.lookAt(battleLook);
+  fitCam.updateMatrixWorld();
+  const poly = hull(arenaPts.map(p => { const n = p.clone().project(fitCam); return [(n.x + 1) / 2 * vw, (1 - n.y) / 2 * vh]; }));
+  const cx = poly.reduce((a, p) => a + p[0], 0) / poly.length, cy = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+  // Scaled by s around its centre and moved to (tx, ty): on screen, clear of every panel?
+  const fits = (s, tx, ty) => {
+    const q = poly.map(([x, y]) => [(x - cx) * s + tx, (y - cy) * s + ty]);
+    return q.every(([x, y]) => x >= pad && x <= vw - pad && y >= pad && y <= vh - pad) && !rects.some(r => overlaps(q, r));
+  };
+  let best = { s: 0, d: 0, tx: cx, ty: cy };
+  // ponytail: 17×17 grid of centres with a binary search on scale each; a few ms, and only when the layout changes
+  for (let i = -1; i <= 16 * 17; i++) {
+    const [tx, ty] = i < 0 ? [cx, cy] : [vw * (i % 17) / 16, vh * Math.floor(i / 17) / 16], d = Math.hypot(tx - cx, ty - cy);
+    let lo = 0, hi = 1;
+    if (fits(1, tx, ty)) lo = 1;
+    else for (let n = 0; n < 12; n++) { const m = (lo + hi) / 2; fits(m, tx, ty) ? lo = m : hi = m; }
+    if (lo > best.s + .002 || (lo > best.s - .002 && d < best.d)) best = { s: lo, d, tx, ty };
+  }
+  const s = best.s || 1; // nothing fits (a tiny window): leave the view alone
+  Object.assign(view, { s, x: best.s ? best.tx - cx * s : 0, y: best.s ? best.ty - cy * s : 0 });
+}
+
 function updateCamera(dt) {
-  const fit = Math.max(1, 1.5 / camera.aspect); // pull back on narrow screens
+  const fit = camFit(camera.aspect);
   orbit.set(CX + Math.sin(time * .12) * 19, 10, CZ + Math.cos(time * .12) * 19);
-  gameCam.set(CX + Math.sin(time * .25) * .25, 15.5 * fit, CZ + 10.6 * fit);
+  battleCam(gameCam, camera.aspect, Math.sin(time * .25) * .25);
   if (joined) camBlend = Math.min(1, camBlend + dt * .6);
   const k = camBlend * camBlend * (3 - 2 * camBlend);
   if (stage) { // swoop in for the muster's line-up or the podium ceremony; glide between the two
@@ -1732,6 +1788,11 @@ function updateCamera(dt) {
   camera.position.x += rnd(-1, 1) * shake * .3;
   camera.position.y += rnd(-1, 1) * shake * .3;
   camera.lookAt(look.set(CX, 0, CZ + .7 * k).lerp(stageLook, stageK));
+  // The HUD fit only applies to the battle view: faded in with it, and out for the muster and podium close-ups.
+  fitView();
+  const f = k * (1 - stageK), s = 1 + (view.s - 1) * f;
+  camera.setViewOffset(innerWidth, innerHeight, -view.x * f / s, -view.y * f / s, innerWidth / s, innerHeight / s);
+  smoke.mat.uniforms.scale.value = fx.mat.uniforms.scale.value = resize.px * s;
 }
 
 let last = performance.now();
